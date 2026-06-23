@@ -112,9 +112,14 @@ export function simularPartida(casa: Time, fora: Time, seed = Math.random()): Re
       if (rng() < chanceGol) {
         const artilheiro = pickAtacante(t, rng);
         if (atacaCasa) golsCasa++; else golsFora++;
+        // ~12% das chances que viram gol são de pênalti — marca no texto pra
+        // o resumo pós-jogo conseguir mostrar a tag "PEN" abaixo do placar.
+        const dePenalti = rng() < 0.12;
         eventos.push({
           minuto: min, tipo: "gol", time: lado,
-          texto: `⚽ ${min}' GOL do ${t.nome}! ${artilheiro.nome} (${artilheiro.forca}) marca. ${golsCasa}x${golsFora}`,
+          texto: dePenalti
+            ? `⚽ ${min}' GOL de pênalti do ${t.nome}! ${artilheiro.nome} (${artilheiro.forca}) marca. ${golsCasa}x${golsFora}`
+            : `⚽ ${min}' GOL do ${t.nome}! ${artilheiro.nome} (${artilheiro.forca}) marca. ${golsCasa}x${golsFora}`,
         });
       } else {
         eventos.push({

@@ -117,23 +117,23 @@ export function CampoAoVivo({ casa, fora, eventoAtual, cobrancaAtual, modo = "pa
             : ehMeuTime
               ? (p.y < 40 ? atracao * 1.2 : atracao * 0.6) // ataque sobe mais que defesa
               : (p.y < 40 ? atracao * 0.5 : atracao * 0.9); // defesa do outro time recua para marcar
-          // gol não sai do gol
+          // gol não sai do gol — totalmente parado
           if (p.numero === 1 || (p.timeCasa && p.y <= 8) || (!p.timeCasa && p.y >= 92)) {
-            // micro-oscilação MUITO sutil para parecer vivo, sem dar a sensação
-            // de tremor aleatório do "jogo de botão".
-            novo[key] = { dx: (Math.random() - 0.5) * 0.25, dy: 0 };
+            novo[key] = { dx: 0, dy: 0 };
             continue;
           }
           const dxIdeal = (b.x - p.x) * peso;
           const dyIdeal = (b.y - p.y) * peso;
           // limita o deslocamento absoluto pra forma da formação não desaparecer
           const lim = 12;
-          // Jitter aleatório drasticamente reduzido — ele existia só pra dar
-          // "vida" ao movimento, mas em excesso fazia parecer aleatório.
+          // Sem jitter aleatório: o movimento é puramente reativo à posição da
+          // bola e ao papel tático do jogador. Resultado: muito mais parecido
+          // com futebol de verdade e nada com jogo de botão.
           novo[key] = {
-            dx: Math.max(-lim, Math.min(lim, dxIdeal)) + (Math.random() - 0.5) * 0.25,
-            dy: Math.max(-lim, Math.min(lim, dyIdeal)) + (Math.random() - 0.5) * 0.2,
+            dx: Math.max(-lim, Math.min(lim, dxIdeal)),
+            dy: Math.max(-lim, Math.min(lim, dyIdeal)),
           };
+
 
         }
         return novo;

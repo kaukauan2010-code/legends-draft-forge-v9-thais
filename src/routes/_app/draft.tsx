@@ -113,11 +113,23 @@ function Draft() {
             <div className="font-display text-lg font-black leading-none">{s.trocasRestantes}/{limiteTrocas}</div>
           </div>
           {(s.selecaoAtual || pendente) && (
-            <div className={cn(
-              "font-display text-3xl font-black tabular-nums",
-              tempo <= 10 ? "text-destructive animate-pulse" : "text-foreground",
-            )}>
-              00:{tempo.toString().padStart(2, "0")}
+            <div className="flex flex-col items-end gap-1 min-w-[88px]">
+              <div className={cn(
+                "font-display text-3xl font-black tabular-nums leading-none",
+                tempo <= 10 ? "text-destructive animate-pulse" : "text-foreground",
+              )}>
+                00:{tempo.toString().padStart(2, "0")}
+              </div>
+              {/* barra de tempo regressiva */}
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                  className={cn(
+                    "h-full transition-all duration-1000 ease-linear",
+                    tempo <= 10 ? "bg-destructive" : "bg-primary",
+                  )}
+                  style={{ width: `${Math.max(0, Math.min(100, (tempo / 30) * 100))}%` }}
+                />
+              </div>
             </div>
           )}
         </div>

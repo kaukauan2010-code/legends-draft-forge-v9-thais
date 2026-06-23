@@ -207,6 +207,7 @@ function Torneio() {
               faseLabel,
               minhaVitoria: !empateReal && (ultimoJogo?.minhaVitoria ?? false),
               empate: empateReal,
+              eventos: res.eventos,
             });
             // Persiste o adversário para exibi-lo no card final de eliminado/campeão.
             setUltimoAdversario(adv);

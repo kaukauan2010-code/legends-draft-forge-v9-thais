@@ -39,7 +39,7 @@ function Torneio() {
   const [penaltisAoVivo, setPenaltisAoVivo] = useState<{ casa: Time; fora: Time; cobrancas: CobrancaPenalti[]; indiceAtual: number } | null>(null);
   // Card pós-partida mostrando os 11 dos dois times lado a lado. Permanece visível
   // até o jogador apertar "continuar" (ou auto-avança em modo automático).
-  const [resumoPosJogo, setResumoPosJogo] = useState<{ meu: Time; adv: Time; placar: string; faseLabel: string; minhaVitoria: boolean; empate: boolean } | null>(null);
+  const [resumoPosJogo, setResumoPosJogo] = useState<{ meu: Time; adv: Time; placar: string; faseLabel: string; minhaVitoria: boolean; empate: boolean; eventos: EventoJogo[] } | null>(null);
   // Guarda o último adversário enfrentado para mostrar no card de eliminado/campeão.
   const [ultimoAdversario, setUltimoAdversario] = useState<Time | null>(null);
   // Segundos restantes até a próxima partida começar sozinha no modo automático

@@ -700,6 +700,10 @@ function Torneio() {
           </p>
         </div>
 
+        {/* Submenu: histórico minuto-a-minuto, igual ao ao vivo */}
+        <HistoricoExpandivel eventos={eventos} />
+
+
 
         <div className="grid grid-cols-2 gap-2">
           <TimeEscalacao time={meuRes} titulo="Seu time" />

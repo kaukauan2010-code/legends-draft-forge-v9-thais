@@ -161,12 +161,16 @@ function Perfil() {
             <KeyRound className="size-3.5" /> Alterar senha
           </div>
           <div className="space-y-1.5">
+            <Label>Senha atual</Label>
+            <Input type="password" autoComplete="current-password" value={senhaAtual} onChange={e => setSenhaAtual(e.target.value)} required />
+          </div>
+          <div className="space-y-1.5">
             <Label>Nova senha</Label>
-            <Input type="password" minLength={6} value={novaSenha} onChange={e => setNovaSenha(e.target.value)} required />
+            <Input type="password" autoComplete="new-password" minLength={6} value={novaSenha} onChange={e => setNovaSenha(e.target.value)} required />
           </div>
           <div className="space-y-1.5">
             <Label>Confirmar nova senha</Label>
-            <Input type="password" minLength={6} value={confSenha} onChange={e => setConfSenha(e.target.value)} required />
+            <Input type="password" autoComplete="new-password" minLength={6} value={confSenha} onChange={e => setConfSenha(e.target.value)} required />
           </div>
           <Button type="submit" disabled={trocarSenha.isPending} className="w-full h-11 font-bold uppercase tracking-widest">
             {trocarSenha.isPending ? "Atualizando..." : "Atualizar senha"}

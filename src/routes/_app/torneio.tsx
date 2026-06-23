@@ -370,6 +370,8 @@ function Torneio() {
           ))}
         </div>
 
+        <MinhaSelecaoLateral meu={meu} />
+
         <Button
           onClick={() => {
             s.confirmarApresentacaoGrupos();

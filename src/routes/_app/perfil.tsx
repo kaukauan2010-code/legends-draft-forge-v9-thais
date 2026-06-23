@@ -31,6 +31,7 @@ function Perfil() {
   const [nome, setNome] = useState("");
   const [avatar, setAvatar] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confSenha, setConfSenha] = useState("");
 

@@ -10,7 +10,7 @@ import type { Estrategia, JogadorEscalado, Time, ResultadoPartida } from "./simu
 import { montarVariosTimesCPU, simularPartida, simularPlacarRapido, simularPenaltis } from "./simulador";
 import type { ResultadoPenaltis } from "./simulador";
 import type { Jogador, Selecao } from "./selecoes";
-import { sortearSelecao, posicoesCompativeis, SELECOES } from "./selecoes";
+import { posicoesCompativeis, SELECOES } from "./selecoes";
 import type { Selecao } from "./selecoes";
 
 export type Modo = "classico" | "almanaque";

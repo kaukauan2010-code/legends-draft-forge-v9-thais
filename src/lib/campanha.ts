@@ -158,7 +158,19 @@ export const useCampanha = create<EstadoCampanha & CampanhaActions>()(
       sortearProxima: () => {
         const s = get();
         if (!s.slotsRestantes.length) return;
-        const sel = sortearSelecao(s.selecoesUsadas);
+        // Garante que o time sorteado tenha pelo menos um jogador disponível
+        // para algum slot livre — evita gastar reroll com time "bloqueado"
+        // (ex: time só com CA quando precisamos de PE/PD/ATA).
+        const posicoesLivres = new Set(s.slotsRestantes.map(sl => sl.posicao));
+        const temJogadorUsavel = (sel: Selecao) =>
+          sel.jogadores.some(j =>
+            !s.nomesJaEscolhidos.includes(j.nome) &&
+            posicoesCompativeis(j.posicao).some(p => posicoesLivres.has(p))
+          );
+        let pool = SELECOES.filter(sel => !s.selecoesUsadas.includes(sel.id) && temJogadorUsavel(sel));
+        if (!pool.length) pool = SELECOES.filter(temJogadorUsavel);
+        if (!pool.length) pool = SELECOES;
+        const sel = pool[Math.floor(Math.random() * pool.length)]!;
         set({
           selecaoAtual: sel,
           selecoesUsadas: [...s.selecoesUsadas, sel.id],

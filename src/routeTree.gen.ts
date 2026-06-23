@@ -9,38 +9,209 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppTorneioRouteImport } from './routes/_app/torneio'
+import { Route as AppPerfilRouteImport } from './routes/_app/perfil'
+import { Route as AppOnlineRouteImport } from './routes/_app/online'
+import { Route as AppJogarRouteImport } from './routes/_app/jogar'
+import { Route as AppHistoricoRouteImport } from './routes/_app/historico'
+import { Route as AppDraftRouteImport } from './routes/_app/draft'
+import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppConquistasRouteImport } from './routes/_app/conquistas'
+import { Route as AppOnlineCodigoRouteImport } from './routes/_app/online.$codigo'
+import { Route as AppOnlineCodigoTorneioRouteImport } from './routes/_app/online.$codigo.torneio'
+import { Route as AppOnlineCodigoDraftRouteImport } from './routes/_app/online.$codigo.draft'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppTorneioRoute = AppTorneioRouteImport.update({
+  id: '/torneio',
+  path: '/torneio',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPerfilRoute = AppPerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOnlineRoute = AppOnlineRouteImport.update({
+  id: '/online',
+  path: '/online',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppJogarRoute = AppJogarRouteImport.update({
+  id: '/jogar',
+  path: '/jogar',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHistoricoRoute = AppHistoricoRouteImport.update({
+  id: '/historico',
+  path: '/historico',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDraftRoute = AppDraftRouteImport.update({
+  id: '/draft',
+  path: '/draft',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConquistasRoute = AppConquistasRouteImport.update({
+  id: '/conquistas',
+  path: '/conquistas',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOnlineCodigoRoute = AppOnlineCodigoRouteImport.update({
+  id: '/$codigo',
+  path: '/$codigo',
+  getParentRoute: () => AppOnlineRoute,
+} as any)
+const AppOnlineCodigoTorneioRoute = AppOnlineCodigoTorneioRouteImport.update({
+  id: '/torneio',
+  path: '/torneio',
+  getParentRoute: () => AppOnlineCodigoRoute,
+} as any)
+const AppOnlineCodigoDraftRoute = AppOnlineCodigoDraftRouteImport.update({
+  id: '/draft',
+  path: '/draft',
+  getParentRoute: () => AppOnlineCodigoRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/conquistas': typeof AppConquistasRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/draft': typeof AppDraftRoute
+  '/historico': typeof AppHistoricoRoute
+  '/jogar': typeof AppJogarRoute
+  '/online': typeof AppOnlineRouteWithChildren
+  '/perfil': typeof AppPerfilRoute
+  '/torneio': typeof AppTorneioRoute
+  '/online/$codigo': typeof AppOnlineCodigoRouteWithChildren
+  '/online/$codigo/draft': typeof AppOnlineCodigoDraftRoute
+  '/online/$codigo/torneio': typeof AppOnlineCodigoTorneioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/conquistas': typeof AppConquistasRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/draft': typeof AppDraftRoute
+  '/historico': typeof AppHistoricoRoute
+  '/jogar': typeof AppJogarRoute
+  '/online': typeof AppOnlineRouteWithChildren
+  '/perfil': typeof AppPerfilRoute
+  '/torneio': typeof AppTorneioRoute
+  '/online/$codigo': typeof AppOnlineCodigoRouteWithChildren
+  '/online/$codigo/draft': typeof AppOnlineCodigoDraftRoute
+  '/online/$codigo/torneio': typeof AppOnlineCodigoTorneioRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_app/conquistas': typeof AppConquistasRoute
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/draft': typeof AppDraftRoute
+  '/_app/historico': typeof AppHistoricoRoute
+  '/_app/jogar': typeof AppJogarRoute
+  '/_app/online': typeof AppOnlineRouteWithChildren
+  '/_app/perfil': typeof AppPerfilRoute
+  '/_app/torneio': typeof AppTorneioRoute
+  '/_app/online/$codigo': typeof AppOnlineCodigoRouteWithChildren
+  '/_app/online/$codigo/draft': typeof AppOnlineCodigoDraftRoute
+  '/_app/online/$codigo/torneio': typeof AppOnlineCodigoTorneioRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/conquistas'
+    | '/dashboard'
+    | '/draft'
+    | '/historico'
+    | '/jogar'
+    | '/online'
+    | '/perfil'
+    | '/torneio'
+    | '/online/$codigo'
+    | '/online/$codigo/draft'
+    | '/online/$codigo/torneio'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/conquistas'
+    | '/dashboard'
+    | '/draft'
+    | '/historico'
+    | '/jogar'
+    | '/online'
+    | '/perfil'
+    | '/torneio'
+    | '/online/$codigo'
+    | '/online/$codigo/draft'
+    | '/online/$codigo/torneio'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/auth'
+    | '/_app/conquistas'
+    | '/_app/dashboard'
+    | '/_app/draft'
+    | '/_app/historico'
+    | '/_app/jogar'
+    | '/_app/online'
+    | '/_app/perfil'
+    | '/_app/torneio'
+    | '/_app/online/$codigo'
+    | '/_app/online/$codigo/draft'
+    | '/_app/online/$codigo/torneio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +219,141 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/torneio': {
+      id: '/_app/torneio'
+      path: '/torneio'
+      fullPath: '/torneio'
+      preLoaderRoute: typeof AppTorneioRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/perfil': {
+      id: '/_app/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof AppPerfilRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/online': {
+      id: '/_app/online'
+      path: '/online'
+      fullPath: '/online'
+      preLoaderRoute: typeof AppOnlineRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/jogar': {
+      id: '/_app/jogar'
+      path: '/jogar'
+      fullPath: '/jogar'
+      preLoaderRoute: typeof AppJogarRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/historico': {
+      id: '/_app/historico'
+      path: '/historico'
+      fullPath: '/historico'
+      preLoaderRoute: typeof AppHistoricoRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/draft': {
+      id: '/_app/draft'
+      path: '/draft'
+      fullPath: '/draft'
+      preLoaderRoute: typeof AppDraftRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/conquistas': {
+      id: '/_app/conquistas'
+      path: '/conquistas'
+      fullPath: '/conquistas'
+      preLoaderRoute: typeof AppConquistasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/online/$codigo': {
+      id: '/_app/online/$codigo'
+      path: '/$codigo'
+      fullPath: '/online/$codigo'
+      preLoaderRoute: typeof AppOnlineCodigoRouteImport
+      parentRoute: typeof AppOnlineRoute
+    }
+    '/_app/online/$codigo/torneio': {
+      id: '/_app/online/$codigo/torneio'
+      path: '/torneio'
+      fullPath: '/online/$codigo/torneio'
+      preLoaderRoute: typeof AppOnlineCodigoTorneioRouteImport
+      parentRoute: typeof AppOnlineCodigoRoute
+    }
+    '/_app/online/$codigo/draft': {
+      id: '/_app/online/$codigo/draft'
+      path: '/draft'
+      fullPath: '/online/$codigo/draft'
+      preLoaderRoute: typeof AppOnlineCodigoDraftRouteImport
+      parentRoute: typeof AppOnlineCodigoRoute
+    }
   }
 }
 
+interface AppOnlineCodigoRouteChildren {
+  AppOnlineCodigoDraftRoute: typeof AppOnlineCodigoDraftRoute
+  AppOnlineCodigoTorneioRoute: typeof AppOnlineCodigoTorneioRoute
+}
+
+const AppOnlineCodigoRouteChildren: AppOnlineCodigoRouteChildren = {
+  AppOnlineCodigoDraftRoute: AppOnlineCodigoDraftRoute,
+  AppOnlineCodigoTorneioRoute: AppOnlineCodigoTorneioRoute,
+}
+
+const AppOnlineCodigoRouteWithChildren = AppOnlineCodigoRoute._addFileChildren(
+  AppOnlineCodigoRouteChildren,
+)
+
+interface AppOnlineRouteChildren {
+  AppOnlineCodigoRoute: typeof AppOnlineCodigoRouteWithChildren
+}
+
+const AppOnlineRouteChildren: AppOnlineRouteChildren = {
+  AppOnlineCodigoRoute: AppOnlineCodigoRouteWithChildren,
+}
+
+const AppOnlineRouteWithChildren = AppOnlineRoute._addFileChildren(
+  AppOnlineRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppConquistasRoute: typeof AppConquistasRoute
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppDraftRoute: typeof AppDraftRoute
+  AppHistoricoRoute: typeof AppHistoricoRoute
+  AppJogarRoute: typeof AppJogarRoute
+  AppOnlineRoute: typeof AppOnlineRouteWithChildren
+  AppPerfilRoute: typeof AppPerfilRoute
+  AppTorneioRoute: typeof AppTorneioRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppConquistasRoute: AppConquistasRoute,
+  AppDashboardRoute: AppDashboardRoute,
+  AppDraftRoute: AppDraftRoute,
+  AppHistoricoRoute: AppHistoricoRoute,
+  AppJogarRoute: AppJogarRoute,
+  AppOnlineRoute: AppOnlineRouteWithChildren,
+  AppPerfilRoute: AppPerfilRoute,
+  AppTorneioRoute: AppTorneioRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -1149,3 +1149,38 @@ function Stat({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
+
+// Submenu colapsável com a linha do tempo da partida (estilo "ao vivo"),
+// para o jogador abrir e revisitar lance a lance no card de resumo pós-jogo.
+function HistoricoExpandivel({ eventos }: { eventos: EventoJogo[] }) {
+  const [aberto, setAberto] = useState(false);
+  const ordenados = [...eventos].sort((a, b) => a.minuto - b.minuto);
+  return (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setAberto(v => !v)}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+      >
+        <span className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
+          <Zap className="size-3.5" /> Histórico da partida
+        </span>
+        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", aberto && "rotate-180")} />
+      </button>
+      {aberto && (
+        <div className="border-t border-border/60 px-4 py-3 max-h-64 overflow-y-auto space-y-1 animate-enter">
+          {ordenados.map((e, i) => (
+            <div key={i} className={cn(
+              "text-[11px] leading-snug",
+              e.tipo === "gol" && "font-bold text-primary",
+              e.tipo === "cartao" && "text-yellow-500",
+              e.tipo === "info" && "text-muted-foreground italic",
+            )}>
+              {e.texto}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

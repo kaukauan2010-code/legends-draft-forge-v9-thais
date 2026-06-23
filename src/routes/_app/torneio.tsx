@@ -285,7 +285,7 @@ function Torneio() {
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground text-center mb-2">{(faseAtiva ?? s.fase).toUpperCase()}</div>
           <div className="flex items-center justify-around">
             <div className="text-center flex-1">
-              <div className="text-2xl mb-1">🏆</div>
+              <div className="text-2xl mb-1">{meu.bandeira || "🏆"}</div>
               <div className="font-display text-xs uppercase truncate">{meu.nome}</div>
               <div className="mt-1 flex items-center justify-center gap-1 text-[9px] uppercase tracking-widest text-muted-foreground">
                 <span className="size-2 rounded-full bg-blue-500" /> Azul

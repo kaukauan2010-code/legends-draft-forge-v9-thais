@@ -224,8 +224,9 @@ function Torneio() {
   };
 
 
-  // Avança a reprodução visual dos pênaltis, cobrança por cobrança. Ao terminar,
-  // fecha a tela de partida ao vivo e segue o fluxo normal (auto ou manual).
+  // Avança a reprodução visual dos pênaltis. No modo automático, segue
+  // sozinho a cada ~1.6s; no manual, o jogador aprta "Bater pênalti" para
+  // avançar (o botão chama setPenaltisAoVivo manualmente).
   useEffect(() => {
     if (!penaltisAoVivo) return;
     const total = penaltisAoVivo.cobrancas.length;
@@ -238,15 +239,17 @@ function Torneio() {
           if (estado.mostrarApresentacaoGrupos || estado.mostrarChaveamento) return;
           iniciarContagemAuto();
         }
-      }, 1200);
+      }, 1500);
       return () => clearTimeout(t);
     }
+    if (!useCampanha.getState().modoAutomatico) return; // espera o clique do usuário
     const t = setTimeout(() => {
       setPenaltisAoVivo(p => p ? { ...p, indiceAtual: p.indiceAtual + 1 } : p);
-    }, 1600);
+    }, 1800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [penaltisAoVivo?.indiceAtual, penaltisAoVivo === null]);
+
 
   useEffect(() => () => {
     if (intervaloRef.current) clearInterval(intervaloRef.current);

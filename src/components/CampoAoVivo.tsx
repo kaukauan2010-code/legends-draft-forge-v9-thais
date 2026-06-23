@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Time } from "@/lib/simulador";
 import type { EventoJogo, CobrancaPenalti } from "@/lib/simulador";
 import { cn } from "@/lib/utils";
+import { FlagEmoji } from "./FlagEmoji";
 
 type Velocidade = "normal" | "rapida" | "ultra";
 
@@ -346,11 +347,11 @@ export function CampoAoVivo({ casa, fora, eventoAtual, cobrancaAtual, modo = "pa
       </div>
 
       {/* legenda dos times */}
-      <div className="absolute top-1 left-1 rounded bg-black/50 px-1.5 py-0.5 text-[8px] font-bold text-white">
-        {casa.bandeira} {casa.nome}
+      <div className="absolute top-1 left-1 rounded bg-black/50 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-1">
+        <FlagEmoji emoji={casa.bandeira} size={12} /> {casa.nome}
       </div>
-      <div className="absolute bottom-1 right-1 rounded bg-black/50 px-1.5 py-0.5 text-[8px] font-bold text-white">
-        {fora.bandeira} {fora.nome}
+      <div className="absolute bottom-1 right-1 rounded bg-black/50 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-1">
+        <FlagEmoji emoji={fora.bandeira} size={12} /> {fora.nome}
       </div>
     </div>
   );

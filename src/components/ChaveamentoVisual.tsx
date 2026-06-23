@@ -1,5 +1,6 @@
 import type { ConfrontoMata, ChaveMata } from "@/lib/campanha";
 import { cn } from "@/lib/utils";
+import { FlagEmoji } from "./FlagEmoji";
 
 interface Props {
   chave: ChaveMata;
@@ -78,7 +79,10 @@ function TimeLinha({ time, venceu }: { time: { nome: string; bandeira: string; i
       venceu && "bg-primary/10 font-bold",
       time?.isCPU === false && "text-primary",
     )}>
-      <span className="shrink-0">{time?.bandeira ?? "❔"}</span>
+      {time?.bandeira
+        ? <FlagEmoji emoji={time.bandeira} size={14} className="shrink-0" />
+        : <span className="shrink-0">❔</span>
+      }
       <span className="truncate flex-1">{time?.nome ?? "A definir"}</span>
     </div>
   );

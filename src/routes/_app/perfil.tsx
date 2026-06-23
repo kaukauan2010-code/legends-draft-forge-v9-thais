@@ -31,6 +31,7 @@ function Perfil() {
   const [nome, setNome] = useState("");
   const [avatar, setAvatar] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confSenha, setConfSenha] = useState("");
 
@@ -54,12 +55,20 @@ function Perfil() {
 
   const trocarSenha = useMutation({
     mutationFn: async () => {
+      if (!senhaAtual) throw new Error("Informe a senha atual");
       if (novaSenha.length < 6) throw new Error("Senha deve ter pelo menos 6 caracteres");
       if (novaSenha !== confSenha) throw new Error("As senhas não coincidem");
+      if (senhaAtual === novaSenha) throw new Error("A nova senha deve ser diferente da atual");
+      // Reautentica primeiro para validar a senha original (Supabase não exige por padrão).
+      const { error: signErr } = await supabase.auth.signInWithPassword({
+        email: user!.email!,
+        password: senhaAtual,
+      });
+      if (signErr) throw new Error("Senha atual incorreta");
       const { error } = await supabase.auth.updateUser({ password: novaSenha });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Senha atualizada"); setNovaSenha(""); setConfSenha(""); },
+    onSuccess: () => { toast.success("Senha atualizada"); setSenhaAtual(""); setNovaSenha(""); setConfSenha(""); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -152,12 +161,16 @@ function Perfil() {
             <KeyRound className="size-3.5" /> Alterar senha
           </div>
           <div className="space-y-1.5">
+            <Label>Senha atual</Label>
+            <Input type="password" autoComplete="current-password" value={senhaAtual} onChange={e => setSenhaAtual(e.target.value)} required />
+          </div>
+          <div className="space-y-1.5">
             <Label>Nova senha</Label>
-            <Input type="password" minLength={6} value={novaSenha} onChange={e => setNovaSenha(e.target.value)} required />
+            <Input type="password" autoComplete="new-password" minLength={6} value={novaSenha} onChange={e => setNovaSenha(e.target.value)} required />
           </div>
           <div className="space-y-1.5">
             <Label>Confirmar nova senha</Label>
-            <Input type="password" minLength={6} value={confSenha} onChange={e => setConfSenha(e.target.value)} required />
+            <Input type="password" autoComplete="new-password" minLength={6} value={confSenha} onChange={e => setConfSenha(e.target.value)} required />
           </div>
           <Button type="submit" disabled={trocarSenha.isPending} className="w-full h-11 font-bold uppercase tracking-widest">
             {trocarSenha.isPending ? "Atualizando..." : "Atualizar senha"}

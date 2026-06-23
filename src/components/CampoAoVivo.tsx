@@ -293,7 +293,7 @@ export function CampoAoVivo({ casa, fora, eventoAtual, cobrancaAtual, modo = "pa
   }, [cobrancaAtual?.rodada, cobrancaAtual?.time, modo]);
 
   return (
-    <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border-4 border-white/10 shadow-inner"
+    <div className="relative aspect-[5/6] w-full max-w-[260px] mx-auto overflow-hidden rounded-xl border-2 border-white/10 shadow-inner"
          style={{ background: "linear-gradient(to bottom, var(--color-pitch) 0%, var(--color-pitch-dark) 50%, var(--color-pitch) 100%)" }}>
       {/* linhas */}
       <div className="pointer-events-none absolute inset-2 rounded border border-white/25" />

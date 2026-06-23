@@ -10,7 +10,8 @@ import type { Estrategia, JogadorEscalado, Time, ResultadoPartida } from "./simu
 import { montarVariosTimesCPU, simularPartida, simularPlacarRapido, simularPenaltis } from "./simulador";
 import type { ResultadoPenaltis } from "./simulador";
 import type { Jogador, Selecao } from "./selecoes";
-import { sortearSelecao, posicoesCompativeis } from "./selecoes";
+import { posicoesCompativeis, SELECOES } from "./selecoes";
+import type { Selecao } from "./selecoes";
 
 export type Modo = "classico" | "almanaque";
 export type FaseTorneio = "grupos" | "oitavas" | "quartas" | "semi" | "final" | "campeao" | "eliminado";
@@ -157,7 +158,19 @@ export const useCampanha = create<EstadoCampanha & CampanhaActions>()(
       sortearProxima: () => {
         const s = get();
         if (!s.slotsRestantes.length) return;
-        const sel = sortearSelecao(s.selecoesUsadas);
+        // Garante que o time sorteado tenha pelo menos um jogador disponível
+        // para algum slot livre — evita gastar reroll com time "bloqueado"
+        // (ex: time só com CA quando precisamos de PE/PD/ATA).
+        const posicoesLivres = new Set(s.slotsRestantes.map(sl => sl.posicao));
+        const temJogadorUsavel = (sel: Selecao) =>
+          sel.jogadores.some(j =>
+            !s.nomesJaEscolhidos.includes(j.nome) &&
+            posicoesCompativeis(j.posicao).some(p => posicoesLivres.has(p))
+          );
+        let pool = SELECOES.filter(sel => !s.selecoesUsadas.includes(sel.id) && temJogadorUsavel(sel));
+        if (!pool.length) pool = SELECOES.filter(temJogadorUsavel);
+        if (!pool.length) pool = SELECOES;
+        const sel = pool[Math.floor(Math.random() * pool.length)]!;
         set({
           selecaoAtual: sel,
           selecoesUsadas: [...s.selecoesUsadas, sel.id],
@@ -478,11 +491,13 @@ export const useCampanha = create<EstadoCampanha & CampanhaActions>()(
             penaltis: pens,
           }];
 
-          // Atualiza a chave com o resultado e vencedor deste confronto
+          // Atualiza a chave APENAS com vencedor/resultado/pênaltis — NÃO sobrescreve
+          // casa/fora originais, pois isso fazia o chaveamento visual (final, etc.) embaralhar
+          // a ordem que vinha das fases anteriores.
           const chaveAtual = s.chave;
           const fasesArr = chaveAtual[s.fase as "oitavas" | "quartas" | "semi" | "final"];
           const novaFaseArr = fasesArr.map(c =>
-            c.id === s.proximoConfronto!.id ? { ...c, casa: casaTime, fora: foraTime, resultado: res, penaltis: pens, vencedor } : c,
+            c.id === s.proximoConfronto!.id ? { ...c, resultado: res, penaltis: pens, vencedor } : c,
           );
           const novaChave: ChaveMata = { ...chaveAtual, [s.fase]: novaFaseArr };
 

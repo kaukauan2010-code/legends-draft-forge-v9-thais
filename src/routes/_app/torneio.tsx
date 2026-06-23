@@ -1002,6 +1002,21 @@ function HistoricoRodada({ h, meu, compact }: { h: EstadoCampanha["historicoJogo
 }
 
 
+// Extrai gols (lado, autor, minuto, se foi pênalti) a partir do log textual da partida.
+// O texto vem do simulador no formato:
+//   "⚽ 23' GOL do Brasil! Pelé (96) marca. 1x0"
+// Detecta pênalti se o texto contiver "pênalti" / "penalti" / "pen.".
+function extrairGols(eventos: EventoJogo[], lado: "casa" | "fora"): { nome: string; minuto: number; penalti: boolean }[] {
+  return eventos
+    .filter(e => e.tipo === "gol" && e.time === lado)
+    .map(e => {
+      const matchNome = e.texto.match(/!\s*([^()]+?)\s*\(/);
+      const nome = matchNome?.[1]?.trim() ?? "—";
+      const penalti = /p[êe]nalti|pen\./i.test(e.texto);
+      return { nome, minuto: e.minuto, penalti };
+    });
+}
+
 function tituloFase(f: string): string {
   return {
     grupos: "Fase de Grupos", oitavas: "Oitavas de Final", quartas: "Quartas de Final",

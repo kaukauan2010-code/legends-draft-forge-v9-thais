@@ -47,6 +47,18 @@ function AuthPage() {
     else toast.success("Conta criada! Já pode jogar.");
   };
 
+  const esqueciSenha = async () => {
+    if (!email) { toast.error("Digite seu email primeiro"); return; }
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setBusy(false);
+    if (error) toast.error(error.message);
+    else toast.success("Enviamos um link de recuperação para seu email.");
+  };
+
+
   const google = async () => {
     setBusy(true);
     const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });

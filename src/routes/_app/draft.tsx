@@ -239,9 +239,9 @@ function Draft() {
           )}
         </div>
 
-        {/* COL 2: CAMPO — centro */}
+        {/* COL 2: CAMPO — centro grande */}
         <div className="flex flex-col items-center">
-          <div className="rounded-xl border border-border bg-card p-2">
+          <div className="rounded-xl border border-border bg-card p-2 w-full max-w-[420px]">
             <div className="flex items-center justify-between mb-1.5 px-1">
               <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Seu time</span>
               <span className="text-[9px] uppercase tracking-widest text-primary">{formacao.nome}</span>

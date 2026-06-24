@@ -396,6 +396,8 @@ export const useCampanha = create<EstadoCampanha & CampanhaActions>()(
           chave: { oitavas: [], quartas: [], semi: [], final: [] },
           proximoConfronto: null, historicoJogos: [],
           mostrarApresentacaoGrupos: true, mostrarChaveamento: null,
+          partidaId: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          jaFoiSalvo: false,
         });
       },
 

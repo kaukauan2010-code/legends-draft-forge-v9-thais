@@ -85,36 +85,42 @@ function Torneio() {
   const salvarPartida = useMutation({
     mutationFn: async () => {
       if (!user || !s.config) return;
-      const { error } = await supabase.from("partidas").insert({
+      const st = useCampanha.getState();
+      if (!st.partidaId) return;
+      const { error } = await supabase.from("partidas").upsert({
+        id: st.partidaId,
         user_id: user.id,
         modo: s.config.modo,
         formacao: s.config.formacaoId,
         estrategia: s.config.estrategia,
-        fase_alcancada: s.fase,
+        fase_alcancada: st.fase,
         pontuacao: 0,
-        campeao: s.fase === "campeao",
-        elenco: s.escalacao as any,
-        log: s.historicoJogos as any,
-      });
+        campeao: st.fase === "campeao",
+        elenco: st.escalacao as any,
+        log: st.historicoJogos as any,
+      }, { onConflict: "id" });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["stats"] });
+      qc.invalidateQueries({ queryKey: ["stats-jogador"] });
       qc.invalidateQueries({ queryKey: ["historico"] });
       qc.invalidateQueries({ queryKey: ["campanhas-dashboard"] });
-      useCampanha.getState().setJaFoiSalvo(true);
+      const st = useCampanha.getState();
+      if (st.fase === "campeao" || st.fase === "eliminado") {
+        useCampanha.getState().setJaFoiSalvo(true);
+      }
     },
   });
 
-  // salvar campanha quando termina — usa timestamp do histórico para evitar duplicatas
-  // quando o usuário navega e volta (salvou reseta, mas s.fase e historicoJogos persistem)
+  // Salva (upsert) a campanha após CADA partida para que o histórico mostre
+  // a campanha em progresso e o dashboard reflita as partidas jogadas.
   useEffect(() => {
-    if ((s.fase === "campeao" || s.fase === "eliminado") && !salvou && user) {
-      // Checa se a partida já foi salva consultando o histórico local via flag no store
-      setSalvou(true);
-      salvarPartida.mutate();
-    }
-  }, [s.fase, salvou, user]);
+    if (!user) return;
+    if (s.historicoJogos.length === 0) return;
+    salvarPartida.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.historicoJogos.length, s.fase, user]);
 
   // Inicia a contagem regressiva visível antes da próxima partida automática.
   // Substitui o antigo setTimeout silencioso por um setInterval que atualiza
@@ -384,43 +390,35 @@ function Torneio() {
           <p className="text-sm text-muted-foreground mt-1">32 times · 8 grupos · top 2 de cada avança às oitavas</p>
         </header>
 
-        <div className="flex gap-4">
-          {/* Grid de grupos (esquerda) */}
-          <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {s.grupos.map((g, gi) => (
-              <div key={g.nome} className={cn(
-                "rounded-lg border bg-card p-2",
-                gi === s.meuGrupoIndex ? "border-primary" : "border-border",
-              )}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-display uppercase tracking-tight font-bold text-[10px]">Grupo {g.nome}</span>
-                  {gi === s.meuGrupoIndex && (
-                    <span className="text-[7px] uppercase tracking-widest text-primary font-bold">Meu</span>
-                  )}
-                </div>
-                <ul className="space-y-0.5">
-                  {g.times.map((t, i) => (
-                    <li key={i} className={cn(
-                      "flex items-center gap-1 text-[9px] rounded px-1 py-0.5",
-                      !t.time.isCPU && "bg-primary/10 font-bold",
-                    )}>
-                      <FlagEmoji emoji={t.time.bandeira} size={10} />
-                      <span className="truncate flex-1">{t.time.nome}</span>
-                    </li>
-                  ))}
-                </ul>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {s.grupos.map((g, gi) => (
+            <div key={g.nome} className={cn(
+              "rounded-lg border bg-card p-2 self-start",
+              gi === s.meuGrupoIndex ? "border-primary" : "border-border",
+            )}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-display uppercase tracking-tight font-bold text-[10px]">Grupo {g.nome}</span>
+                {gi === s.meuGrupoIndex && (
+                  <span className="text-[7px] uppercase tracking-widest text-primary font-bold">Meu</span>
+                )}
               </div>
-            ))}
-          </div>
-          {/* Minha seleção (direita) */}
-          <div className="w-52 shrink-0 hidden sm:block">
-            <MinhaSelecaoLateral meu={meu} />
-          </div>
+              <ul className="space-y-0.5">
+                {g.times.map((t, i) => (
+                  <li key={i} className={cn(
+                    "flex items-center gap-1 text-[9px] rounded px-1 py-0.5",
+                    !t.time.isCPU && "bg-primary/10 font-bold",
+                  )}>
+                    <FlagEmoji emoji={t.time.bandeira} size={10} />
+                    <span className="truncate flex-1">{t.time.nome}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-        {/* Minha seleção (mobile: abaixo) */}
-        <div className="sm:hidden">
-          <MinhaSelecaoLateral meu={meu} />
-        </div>
+
+        {/* Minha seleção abaixo de todos os grupos */}
+        <MinhaSelecaoLateral meu={meu} />
 
         <Button
           onClick={() => {
@@ -1185,14 +1183,14 @@ function MinhaSelecaoLateral({ meu }: { meu: Time }) {
   });
   return (
     <section className="rounded-2xl border border-primary/40 bg-card p-3">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="font-display uppercase text-xs tracking-widest text-primary">Minha seleção</h2>
-        <span className="text-[9px] uppercase tracking-widest text-muted-foreground">{meu.formacao.nome}</span>
-      </div>
-      <div className="grid grid-cols-3 gap-1 mb-3 rounded-lg bg-secondary/40 p-2">
-        <Stat label="Força" value={st.forca} />
-        <Stat label="Ataque" value={st.ataque} />
-        <Stat label="Defesa" value={st.defesa} />
+      <div className="flex items-center justify-between gap-2 mb-2 rounded-md bg-secondary/40 px-2 py-1.5">
+        <span className="font-display uppercase text-[10px] tracking-widest text-primary shrink-0">Minha força</span>
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="flex items-center gap-1"><span className="text-muted-foreground uppercase tracking-widest text-[8px]">F</span><span className="font-display font-black tabular-nums">{st.forca}</span></span>
+          <span className="flex items-center gap-1"><span className="text-muted-foreground uppercase tracking-widest text-[8px]">A</span><span className="font-display font-black tabular-nums">{st.ataque}</span></span>
+          <span className="flex items-center gap-1"><span className="text-muted-foreground uppercase tracking-widest text-[8px]">D</span><span className="font-display font-black tabular-nums">{st.defesa}</span></span>
+          <span className="text-[9px] uppercase tracking-widest text-muted-foreground">{meu.formacao.nome}</span>
+        </div>
       </div>
       <ul className="space-y-1">
         {ordenados.map(j => (

@@ -77,6 +77,7 @@ export interface EstadoCampanha {
   mostrarChaveamento: FaseTorneio | null; // qual fase de mata-mata mostrar o chaveamento antes de jogar
   modoAutomatico: boolean;
   jaFoiSalvo: boolean; // evita re-salvar ao navegar de volta
+  partidaId: string | null; // id da row em `partidas` para upsert incremental
 }
 
 interface CampanhaActions {
@@ -116,6 +117,7 @@ function estadoInicial(): EstadoCampanha {
     mostrarApresentacaoGrupos: false, mostrarChaveamento: null,
     modoAutomatico: false,
     jaFoiSalvo: false,
+    partidaId: null,
   };
 }
 
@@ -394,6 +396,8 @@ export const useCampanha = create<EstadoCampanha & CampanhaActions>()(
           chave: { oitavas: [], quartas: [], semi: [], final: [] },
           proximoConfronto: null, historicoJogos: [],
           mostrarApresentacaoGrupos: true, mostrarChaveamento: null,
+          partidaId: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          jaFoiSalvo: false,
         });
       },
 

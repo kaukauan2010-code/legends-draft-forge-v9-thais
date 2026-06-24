@@ -124,7 +124,8 @@ function Draft() {
       </div>
 
       {/* GRID PRINCIPAL: lista de seleção | campo | escalação */}
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr_220px] gap-3">
+
 
         {/* COL 1: Jogadores disponíveis da seleção sorteada */}
         <div className="rounded-xl border border-border bg-card p-2.5">
@@ -238,9 +239,9 @@ function Draft() {
           )}
         </div>
 
-        {/* COL 2: CAMPO — centro */}
+        {/* COL 2: CAMPO — centro grande */}
         <div className="flex flex-col items-center">
-          <div className="rounded-xl border border-border bg-card p-2">
+          <div className="rounded-xl border border-border bg-card p-2 w-full max-w-[420px]">
             <div className="flex items-center justify-between mb-1.5 px-1">
               <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Seu time</span>
               <span className="text-[9px] uppercase tracking-widest text-primary">{formacao.nome}</span>

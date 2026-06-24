@@ -43,8 +43,12 @@ function Jogar() {
           <span className="text-[10px] uppercase tracking-widest text-primary font-bold">{formacaoId}</span>
         </div>
         <div className="flex gap-3 items-start">
-          {/* Grade de botões de formação */}
-          <div className="grid grid-cols-2 gap-1.5 flex-1">
+          {/* Mini campo grande (à esquerda) */}
+          <div className="shrink-0 w-[180px]">
+            <MiniCampo formacao={FORMACOES[formacaoId]} escalacao={[]} />
+          </div>
+          {/* Lista de formações em coluna estreita */}
+          <div className="grid grid-cols-1 gap-1.5 flex-1">
             {LISTA_FORMACOES.map(f => (
               <button
                 key={f.id}
@@ -57,10 +61,6 @@ function Jogar() {
                 {f.nome}
               </button>
             ))}
-          </div>
-          {/* Mini campo menor */}
-          <div className="shrink-0 w-[100px]">
-            <MiniCampo formacao={FORMACOES[formacaoId]} escalacao={[]} />
           </div>
         </div>
       </section>

@@ -44,6 +44,18 @@ function Dashboard() {
     },
   });
 
+  // Estatísticas agregadas (atualizadas após cada partida) — usadas para os HUDs
+  const { data: stats_db } = useQuery({
+    queryKey: ["stats-jogador", user?.id],
+    enabled: !!user,
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: async () => {
+      const { data } = await supabase.from("stats_jogador").select("*").eq("user_id", user!.id).maybeSingle();
+      return data;
+    },
+  });
+
   // Busca direta do total de conquistas desbloqueadas (não depende do hook de estado local)
   const { data: conquistas_db } = useQuery({
     queryKey: ["conquistas-count", user?.id],
@@ -60,10 +72,14 @@ function Dashboard() {
   });
 
   const todas = campanhas ?? [];
-  const vitoriosas = todas.filter(p => p.fase_alcancada !== "grupos" && p.fase_alcancada !== "eliminado");
   const campeas = todas.filter(p => p.campeao);
+  const vitoriosas = todas.filter(p => p.fase_alcancada !== "grupos" && p.fase_alcancada !== "eliminado");
 
-  const stats = { total: todas.length, vitorias: vitoriosas.length, titulos: campeas.length };
+  const stats = {
+    total: stats_db?.partidas_jogadas ?? 0,
+    vitorias: stats_db?.vitorias ?? 0,
+    titulos: stats_db?.titulos ?? campeas.length,
+  };
 
   const listaDoPainel =
     painelAberto === "partidas" ? todas :

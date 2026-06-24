@@ -384,43 +384,35 @@ function Torneio() {
           <p className="text-sm text-muted-foreground mt-1">32 times · 8 grupos · top 2 de cada avança às oitavas</p>
         </header>
 
-        <div className="flex gap-4">
-          {/* Grid de grupos (esquerda) */}
-          <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {s.grupos.map((g, gi) => (
-              <div key={g.nome} className={cn(
-                "rounded-lg border bg-card p-2",
-                gi === s.meuGrupoIndex ? "border-primary" : "border-border",
-              )}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-display uppercase tracking-tight font-bold text-[10px]">Grupo {g.nome}</span>
-                  {gi === s.meuGrupoIndex && (
-                    <span className="text-[7px] uppercase tracking-widest text-primary font-bold">Meu</span>
-                  )}
-                </div>
-                <ul className="space-y-0.5">
-                  {g.times.map((t, i) => (
-                    <li key={i} className={cn(
-                      "flex items-center gap-1 text-[9px] rounded px-1 py-0.5",
-                      !t.time.isCPU && "bg-primary/10 font-bold",
-                    )}>
-                      <FlagEmoji emoji={t.time.bandeira} size={10} />
-                      <span className="truncate flex-1">{t.time.nome}</span>
-                    </li>
-                  ))}
-                </ul>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {s.grupos.map((g, gi) => (
+            <div key={g.nome} className={cn(
+              "rounded-lg border bg-card p-2 self-start",
+              gi === s.meuGrupoIndex ? "border-primary" : "border-border",
+            )}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-display uppercase tracking-tight font-bold text-[10px]">Grupo {g.nome}</span>
+                {gi === s.meuGrupoIndex && (
+                  <span className="text-[7px] uppercase tracking-widest text-primary font-bold">Meu</span>
+                )}
               </div>
-            ))}
-          </div>
-          {/* Minha seleção (direita) */}
-          <div className="w-52 shrink-0 hidden sm:block">
-            <MinhaSelecaoLateral meu={meu} />
-          </div>
+              <ul className="space-y-0.5">
+                {g.times.map((t, i) => (
+                  <li key={i} className={cn(
+                    "flex items-center gap-1 text-[9px] rounded px-1 py-0.5",
+                    !t.time.isCPU && "bg-primary/10 font-bold",
+                  )}>
+                    <FlagEmoji emoji={t.time.bandeira} size={10} />
+                    <span className="truncate flex-1">{t.time.nome}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-        {/* Minha seleção (mobile: abaixo) */}
-        <div className="sm:hidden">
-          <MinhaSelecaoLateral meu={meu} />
-        </div>
+
+        {/* Minha seleção abaixo de todos os grupos */}
+        <MinhaSelecaoLateral meu={meu} />
 
         <Button
           onClick={() => {

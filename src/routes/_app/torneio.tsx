@@ -261,9 +261,8 @@ function Torneio() {
   };
 
 
-  // Avança a reprodução visual dos pênaltis. No modo automático, segue
-  // sozinho a cada ~1.6s; no manual, o jogador aprta "Bater pênalti" para
-  // avançar (o botão chama setPenaltisAoVivo manualmente).
+  // Avança automaticamente a disputa de pênaltis. O ritmo segue a velocidade
+  // escolhida pelo jogador na tela da partida — sem botão manual.
   useEffect(() => {
     if (!penaltisAoVivo) return;
     const total = penaltisAoVivo.cobrancas.length;
@@ -276,16 +275,16 @@ function Torneio() {
           if (estado.mostrarApresentacaoGrupos || estado.mostrarChaveamento) return;
           iniciarContagemAuto();
         }
-      }, 1500);
+      }, 1800);
       return () => clearTimeout(t);
     }
-    if (!useCampanha.getState().modoAutomatico) return; // espera o clique do usuário
+    const delay = velocidade === "ultra" ? 700 : velocidade === "rapida" ? 1400 : 2400;
     const t = setTimeout(() => {
       setPenaltisAoVivo(p => p ? { ...p, indiceAtual: p.indiceAtual + 1 } : p);
-    }, 1800);
+    }, delay);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [penaltisAoVivo?.indiceAtual, penaltisAoVivo === null]);
+  }, [penaltisAoVivo?.indiceAtual, penaltisAoVivo === null, velocidade]);
 
 
   useEffect(() => () => {
@@ -620,49 +619,72 @@ function Torneio() {
           </div>
         </header>
 
-        {/* Stadium view (gol + bola) */}
+        {/* Stadium view (gol + bola + luva do goleiro) */}
         <main className="relative flex-1 flex flex-col justify-center items-center px-6 overflow-hidden">
           <div className="absolute inset-0 pointer-events-none"
                style={{ background: "radial-gradient(ellipse at 50% 60%, var(--pen-light) 0%, transparent 60%)" }} />
 
           <div className="relative w-full max-w-sm aspect-[4/5] flex flex-col">
-            {/* Trave */}
-            <div className="relative w-full h-48 border-x-4 border-t-4 border-white/80 rounded-t-sm shadow-[0_-20px_60px_-10px_rgba(255,255,255,0.1)]">
-              <div className="absolute inset-0"
-                   style={{ background: "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.05) 0%, transparent 70%)" }} />
-              {/* Goleiro */}
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-20 bg-white/10 blur-xl" />
-              {/* Indicador de gol/erro do último chute */}
-              {cobrancasFeitas.length > 0 && (
-                <div
-                  key={cobrancasFeitas.length}
-                  className={cn(
-                    "absolute font-pen-display text-3xl uppercase tracking-widest animate-pen-enter",
-                    "top-2 left-1/2 -translate-x-1/2",
-                    cobrancasFeitas[cobrancasFeitas.length - 1]!.acertou ? "text-pen-goal" : "text-pen-miss",
-                  )}
-                >
-                  {cobrancasFeitas[cobrancasFeitas.length - 1]!.acertou ? "GOL!" : "PERDEU"}
-                </div>
-              )}
+            {/* Trave + rede */}
+            <div className="relative w-full h-56 border-x-4 border-t-4 border-white/80 rounded-t-sm overflow-hidden shadow-[0_-20px_60px_-10px_rgba(255,255,255,0.1)]">
+              {/* rede */}
+              <div className="absolute inset-0 opacity-25" style={{
+                backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.5) 1px, transparent 1px)",
+                backgroundSize: "18px 18px",
+              }} />
+              {(() => {
+                const ultima = cobrancasFeitas[cobrancasFeitas.length - 1];
+                if (!ultima) return null;
+                const pos = posicoesPenalti(ultima);
+                return (
+                  <>
+                    {/* luva do goleiro */}
+                    <div
+                      key={`luva-${cobrancasFeitas.length}`}
+                      className="absolute text-3xl transition-all duration-500 ease-out animate-pen-enter"
+                      style={{ left: `${pos.luva.x}%`, top: `${pos.luva.y}%`, transform: "translate(-50%, -50%)" }}
+                    >
+                      🧤
+                    </div>
+                    {/* bola */}
+                    <div
+                      key={`bola-${cobrancasFeitas.length}`}
+                      className="absolute text-2xl transition-all duration-700 ease-out"
+                      style={{ left: `${pos.bola.x}%`, top: `${pos.bola.y}%`, transform: "translate(-50%, -50%)", filter: ultima.acertou ? "drop-shadow(0 0 8px rgba(34,197,94,0.8))" : "drop-shadow(0 0 8px rgba(239,68,68,0.8))" }}
+                    >
+                      ⚽
+                    </div>
+                    {/* label */}
+                    <div
+                      key={`label-${cobrancasFeitas.length}`}
+                      className={cn(
+                        "absolute top-2 left-1/2 -translate-x-1/2 font-pen-display text-3xl uppercase tracking-widest animate-pen-enter",
+                        ultima.acertou ? "text-pen-goal" : "text-pen-miss",
+                      )}
+                    >
+                      {ultima.acertou ? "GOL!" : "PEGOU!"}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Gramado + marca do pênalti */}
             <div className="flex-1 relative" style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.05), transparent)" }}>
               <div className="absolute top-0 left-0 w-full h-px bg-white/10" />
-              <div className="absolute top-32 left-1/2 -translate-x-1/2">
+              <div className="absolute top-16 left-1/2 -translate-x-1/2">
                 <div className="size-4 rounded-full bg-white/20 animate-pen-focus" />
-                <div className="absolute -top-1 -left-1 size-6 bg-foreground rounded-full shadow-[0_0_15px_rgba(255,255,255,0.5)] ring-4 ring-black/20" />
               </div>
             </div>
           </div>
 
           {/* Próximo batedor */}
           {proximoBatedor && !acabou && (
-            <div key={indiceAtual} className="absolute bottom-8 left-0 w-full px-8 text-center animate-pen-enter">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-foreground/50 mb-1">Próximo Batedor</p>
-              <h3 className="font-pen-display text-4xl tracking-wider">{proximoBatedor.jogador}</h3>
+            <div key={indiceAtual} className="absolute bottom-4 left-0 w-full px-8 text-center animate-pen-enter">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-foreground/50 mb-1">Cobrando agora</p>
+              <h3 className="font-pen-display text-3xl tracking-wider">{proximoBatedor.jogador}</h3>
               <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full">
+                <FlagEmoji emoji={proximoBatedor.time === "casa" ? flagCasa : flagFora} size={12} />
                 <span className="text-[10px] font-bold text-pen-goal">
                   {proximoBatedor.time === "casa" ? nomeCasa.toUpperCase() : nomeFora.toUpperCase()}
                 </span>
@@ -671,37 +693,14 @@ function Torneio() {
           )}
         </main>
 
-        {/* Footer: bater pênalti + histórico */}
-        <footer className="p-6 pt-0 space-y-4">
-          <button
-            type="button"
-            onClick={() => {
-              if (acabou) return;
-              setPenaltisAoVivo(p => p ? { ...p, indiceAtual: p.indiceAtual + 1 } : p);
-            }}
-            disabled={acabou}
-            className={cn(
-              "w-full group relative overflow-hidden bg-foreground text-pen-dark font-pen-display text-2xl py-5 tracking-widest uppercase transition-all",
-              !acabou && "hover:bg-pen-goal hover:text-foreground",
-              acabou && "opacity-50 cursor-not-allowed",
-            )}
-          >
-            <span className="relative z-10">{acabou ? "Disputa finalizada" : "Bater pênalti"}</span>
-          </button>
-
-          <div className="grid grid-cols-4 gap-2">
-            {cobrancasFeitas.slice(-8).map((c, i) => {
-              const label = c.time === "casa" ? `${c.rodada}º (${(nomeCasa[0] ?? "?")}${nomeCasa[1] ?? ""})` : `${c.rodada}º (${(nomeFora[0] ?? "?")}${nomeFora[1] ?? ""})`;
-              return (
-                <div key={i} className="bg-white/5 p-2 rounded flex flex-col gap-1 border border-white/5">
-                  <span className="text-[8px] text-foreground/40 uppercase">{label}</span>
-                  <span className="text-[10px] font-bold truncate">{c.jogador}</span>
-                  <span className={cn("text-[8px]", c.acertou ? "text-pen-goal" : "text-pen-miss")}>
-                    {c.acertou ? "GOL" : "ERRO"}
-                  </span>
-                </div>
-              );
-            })}
+        {/* Footer: histórico SEPARADO por time */}
+        <footer className="p-4 pt-2 space-y-3">
+          <div className="text-center text-[10px] uppercase tracking-[0.3em] text-foreground/40">
+            {acabou ? "Disputa finalizada" : `Automático · ${velocidade}`}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <TimePenaltisLista nome={nomeCasa} bandeira={flagCasa} todas={cobrancas.filter(c => c.time === "casa")} feitas={cobrancasFeitas} alinhamento="esquerda" />
+            <TimePenaltisLista nome={nomeFora} bandeira={flagFora} todas={cobrancas.filter(c => c.time === "fora")} feitas={cobrancasFeitas} alinhamento="direita" />
           </div>
         </footer>
       </div>

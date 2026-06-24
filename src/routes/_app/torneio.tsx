@@ -437,7 +437,9 @@ function Torneio() {
   // Sequência: ao entrar em oitavas/quartas/semi/final, primeiro mostramos
   // um card da próxima partida (meu time vs adversário). Depois do "Continuar",
   // o jogador vê o chaveamento completo. Por fim, "Iniciar partida" arranca.
-  if (s.mostrarChaveamento && meu) {
+  // Mostra o chaveamento APENAS quando não há resumo pós-jogo nem pênaltis pendentes —
+  // garante a ordem: partida ao vivo → card de fim → chaveamento → próxima preview.
+  if (s.mostrarChaveamento && meu && !resumoPosJogo && !penaltisAoVivo) {
     const faseChave = s.mostrarChaveamento as "oitavas" | "quartas" | "semi" | "final";
     const conf = s.proximoConfronto;
     const advNoConfronto: Time | null =

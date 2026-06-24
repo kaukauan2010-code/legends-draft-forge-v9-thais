@@ -391,6 +391,21 @@ export const useCampanha = create<EstadoCampanha & CampanhaActions>()(
           }
           grupos[gi]!.times = timesDoGrupo.map(linhaVazia);
         }
+        // Pré-simula TODOS os jogos CPU vs CPU em TODOS os grupos antes da fase
+        // começar — assim os outros grupos não ficam zerados enquanto o jogador
+        // disputa as 3 rodadas dele. O grupo do jogador também tem as partidas
+        // entre as 3 CPUs simuladas; só faltam as 3 do jogador.
+        grupos.forEach(g => {
+          for (let i = 0; i < g.times.length; i++) {
+            for (let j = i + 1; j < g.times.length; j++) {
+              const a = g.times[i]!, b = g.times[j]!;
+              if (a.time.isCPU && b.time.isCPU) {
+                const r = simularPlacarRapido(a.time, b.time);
+                aplicarResultado(a, b, r.golsCasa, r.golsFora);
+              }
+            }
+          }
+        });
         set({
           fase: "grupos", grupos, meuGrupoIndex,
           chave: { oitavas: [], quartas: [], semi: [], final: [] },

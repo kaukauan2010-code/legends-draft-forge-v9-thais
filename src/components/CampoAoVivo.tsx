@@ -14,8 +14,8 @@ interface Props {
   /** Quando em modo pênaltis, a cobrança atual sendo batida */
   cobrancaAtual?: CobrancaPenalti | null;
   modo?: "partida" | "penaltis";
-  /** Velocidade selecionada pelo jogador para a partida — controla o ritmo do
-   * movimento contínuo dos jogadores em campo (estilo futebol de botão). */
+  /** Velocidade selecionada pelo jogador — controla a frequência de jogadas e
+   *  a rapidez com que os jogadores se reposicionam (lerp por frame). */
   velocidade?: Velocidade;
 }
 
@@ -29,37 +29,33 @@ interface PosicaoBolinha {
   timeCasa: boolean;
 }
 
-// Intervalo entre "passos" de movimento contínuo dos jogadores, por velocidade.
-// Passos curtos + transição CSS suave dão sensação de movimento contínuo, não
-// teletransporte aleatório. Em "ultra" o ritmo é mais rápido pra acompanhar
-// a simulação acelerada dos 90 minutos.
-const INTERVALO_MOVIMENTO_MS: Record<Velocidade, number> = {
-  normal: 1200,
-  rapida: 700,
-  ultra: 300,
+// Quão "rápido" cada jogador interpola por frame em direção ao alvo (0..1).
+// Valores baixos = movimento suave/realista; altos = reativo demais.
+const VEL_LERP: Record<Velocidade, number> = {
+  normal: 0.025,
+  rapida: 0.045,
+  ultra: 0.085,
 };
-// Quão forte cada jogador é atraído pela bola (0 = ignora, 1 = vai direto).
-// Valores moderados pra acompanhar a bola sem desfazer a formação.
-const ATRACAO_BOLA: Record<Velocidade, number> = {
-  normal: 0.18,
-  rapida: 0.26,
-  ultra: 0.4,
+// Intervalo entre RECÁLCULOS de alvo (não de posição — a posição interpola
+// continuamente via rAF). Alvos mudam menos vezes que frames pra ficar natural.
+const INTERVALO_ALVO_MS: Record<Velocidade, number> = {
+  normal: 900,
+  rapida: 550,
+  ultra: 260,
 };
 
 
 
-// Converte as coordenadas de um time para o sistema do campo combinado:
-// casa ocupa a metade de cima (seu gol em y=4, ataque avança até y≈48)
-// fora ocupa a metade de baixo (seu gol em y=96, ataque avança até y≈52), espelhado.
+
+// Coordenadas internas: casa ocupa a metade "de cima" (y baixo = gol da casa),
+// fora ocupa a metade "de baixo". Para renderizar HORIZONTAL, o componente abaixo
+// transpõe x↔y na hora de pintar, mas a lógica de jogadas continua intacta.
 function calcularPosicoes(time: Time, ehCasa: boolean): PosicaoBolinha[] {
   return time.formacao.slots.map(slot => {
     const jog = time.escalacao.find(j => j.slotId === slot.id);
-    // slot.y: 0 = ataque do próprio time, 100 = goleiro do próprio time.
-    // Casa: mapeia para 4 (seu gol) .. 48 (zona de ataque, perto do meio).
-    // Fora: espelha — mapeia para 96 (seu gol) .. 52 (zona de ataque, perto do meio).
     const yCombinado = ehCasa
-      ? 4 + (slot.y / 100) * 44   // y=100(gol)→48 ... y=0(ataque)→4
-      : 96 - (slot.y / 100) * 44; // y=100(gol)→52 ... y=0(ataque)→96
+      ? 4 + (slot.y / 100) * 44
+      : 96 - (slot.y / 100) * 44;
     return {
       id: slot.id,
       nome: jog?.nome ?? "?",
@@ -83,66 +79,109 @@ export function CampoAoVivo({ casa, fora, eventoAtual, cobrancaAtual, modo = "pa
   const todasPosicoes = [...posCasa, ...posFora];
 
   const [bola, setBola] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
-  const [destaque, setDestaque] = useState<string | null>(null); // id do jogador em destaque
-  // Deslocamento atual de cada jogador em relação à sua posição-base.
-  // Já NÃO é aleatório — é calculado em função da posição atual da bola: jogadores
-  // do time com posse avançam, o restante recua/marca, mantendo a forma geral da
-  // formação. Resultado parece muito mais com futebol e menos com jogo de botão.
+  const [destaque, setDestaque] = useState<string | null>(null);
+  // Posição interpolada de cada jogador (atualizada a 60fps via rAF, NUNCA por
+  // setInterval). Isso elimina o "snap" de futebol de botão — cada jogador anda
+  // suavemente em direção ao alvo que muda conforme a bola e a posse.
   const [deslocamentos, setDeslocamentos] = useState<Record<string, { dx: number; dy: number }>>({});
+  const deslocRef = useRef<Record<string, { dx: number; dy: number }>>({});
+  const alvosRef = useRef<Record<string, { dx: number; dy: number; runUntil: number }>>({});
   const animRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const movimentoRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const alvoTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const bolaRef = useRef(bola);
   const posseRef = useRef<"casa" | "fora" | null>(null);
   bolaRef.current = bola;
 
-  // Movimento contínuo coordenado: a cada "passo", cada jogador é puxado um pouco
-  // em direção à posição que faria sentido dado onde está a bola — não com
-  // movimento aleatório. Atacantes do time com posse sobem; defensores do time
-  // sem posse recuam para marcar. A força e a forma da formação são preservadas.
+  // === Recalcula ALVO de cada jogador periodicamente (não a posição em si).
+  // Atacantes do time com posse fazem "corridas" pra frente; meio-campistas
+  // giram pra dar opção de passe; defensores recuam em bloco quando o outro
+  // time ataca. Um leve componente aleatório simula desmarcação natural.
   useEffect(() => {
-    if (movimentoRef.current) clearInterval(movimentoRef.current);
-    const atracao = ATRACAO_BOLA[velocidade];
-    movimentoRef.current = setInterval(() => {
+    if (alvoTickRef.current) clearInterval(alvoTickRef.current);
+    alvoTickRef.current = setInterval(() => {
       const b = bolaRef.current;
       const posse = posseRef.current;
-      setDeslocamentos(() => {
-        const novo: Record<string, { dx: number; dy: number }> = {};
-        for (const p of todasPosicoes) {
-          const key = `${p.timeCasa ? "c" : "f"}-${p.id}`;
-          const ehMeuTime = (p.timeCasa && posse === "casa") || (!p.timeCasa && posse === "fora");
-          // alvo desejado: jogador puxado em direção à bola, mas só uma fração da
-          // distância — defensores/goleiros são puxados menos (têm que segurar
-          // a linha), atacantes mais. Sem time de posse, todos quase param.
-          const peso = posse == null
-            ? 0.05
-            : ehMeuTime
-              ? (p.y < 40 ? atracao * 1.2 : atracao * 0.6) // ataque sobe mais que defesa
-              : (p.y < 40 ? atracao * 0.5 : atracao * 0.9); // defesa do outro time recua para marcar
-          // gol não sai do gol — totalmente parado
-          if (p.numero === 1 || (p.timeCasa && p.y <= 8) || (!p.timeCasa && p.y >= 92)) {
-            novo[key] = { dx: 0, dy: 0 };
-            continue;
-          }
-          const dxIdeal = (b.x - p.x) * peso;
-          const dyIdeal = (b.y - p.y) * peso;
-          // limita o deslocamento absoluto pra forma da formação não desaparecer
-          const lim = 12;
-          // Sem jitter aleatório: o movimento é puramente reativo à posição da
-          // bola e ao papel tático do jogador. Resultado: muito mais parecido
-          // com futebol de verdade e nada com jogo de botão.
-          novo[key] = {
-            dx: Math.max(-lim, Math.min(lim, dxIdeal)),
-            dy: Math.max(-lim, Math.min(lim, dyIdeal)),
-          };
-
-
+      const agora = performance.now();
+      const novos: Record<string, { dx: number; dy: number; runUntil: number }> = {};
+      for (const p of todasPosicoes) {
+        const key = `${p.timeCasa ? "c" : "f"}-${p.id}`;
+        const anterior = alvosRef.current[key];
+        // Mantém corrida atual até terminar — dá continuidade de movimento.
+        if (anterior && anterior.runUntil > agora) {
+          novos[key] = anterior;
+          continue;
         }
-        return novo;
-      });
-    }, INTERVALO_MOVIMENTO_MS[velocidade]);
-    return () => { if (movimentoRef.current) clearInterval(movimentoRef.current); };
+        // Goleiro fica preso ao gol, só desloca lateralmente seguindo a bola.
+        const ehGoleiro = p.numero === 1 || (p.timeCasa && p.y <= 8) || (!p.timeCasa && p.y >= 92);
+        if (ehGoleiro) {
+          const lateral = (b.x - p.x) * 0.15;
+          novos[key] = { dx: Math.max(-6, Math.min(6, lateral)), dy: 0, runUntil: agora + 600 };
+          continue;
+        }
+        const ehMeuTime = (p.timeCasa && posse === "casa") || (!p.timeCasa && posse === "fora");
+        const ehAtacante = p.timeCasa ? p.y < 28 : p.y > 72;
+        const ehMeio = p.timeCasa ? p.y >= 28 && p.y < 42 : p.y > 58 && p.y <= 72;
+        // Componente direcional (puxa pela bola/papel) + componente aleatório
+        // (desmarcação/oscilação). A soma evita movimento mecânico.
+        let pesoX = 0.15, pesoY = 0.15;
+        if (posse != null) {
+          if (ehMeuTime) {
+            // ataque sobe pra frente da bola; meio gira lateral; defesa fecha
+            pesoX = ehAtacante ? 0.35 : ehMeio ? 0.22 : 0.10;
+            pesoY = ehAtacante ? 0.45 : ehMeio ? 0.28 : 0.12;
+          } else {
+            // marcação: defesa recua em bloco, meio fecha espaço
+            pesoX = ehAtacante ? 0.12 : ehMeio ? 0.25 : 0.30;
+            pesoY = ehAtacante ? 0.10 : ehMeio ? 0.30 : 0.38;
+          }
+        }
+        const dirX = (b.x - p.x) * pesoX;
+        const dirY = (b.y - p.y) * pesoY;
+        // ruído de "corrida em diagonal" — magnitude pequena, pra desmarcar
+        const ruidoX = (Math.random() - 0.5) * (ehAtacante ? 8 : 4);
+        const ruidoY = (Math.random() - 0.5) * (ehAtacante ? 6 : 3);
+        const lim = ehAtacante ? 16 : ehMeio ? 12 : 8;
+        novos[key] = {
+          dx: Math.max(-lim, Math.min(lim, dirX + ruidoX)),
+          dy: Math.max(-lim, Math.min(lim, dirY + ruidoY)),
+          runUntil: agora + INTERVALO_ALVO_MS[velocidade] * (0.6 + Math.random() * 0.8),
+        };
+      }
+      alvosRef.current = novos;
+    }, INTERVALO_ALVO_MS[velocidade]);
+    return () => { if (alvoTickRef.current) clearInterval(alvoTickRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [velocidade, casa.nome, fora.nome]);
+
+  // === Loop de interpolação a 60fps: a cada frame, puxa a posição atual de
+  // cada jogador um pouco mais perto do alvo. Resultado = movimento contínuo
+  // e fluido, sem "saltos" entre posições.
+  useEffect(() => {
+    const lerp = VEL_LERP[velocidade];
+    const tick = () => {
+      const atuais = deslocRef.current;
+      const alvos = alvosRef.current;
+      const novo: Record<string, { dx: number; dy: number }> = {};
+      let mudou = false;
+      for (const p of todasPosicoes) {
+        const key = `${p.timeCasa ? "c" : "f"}-${p.id}`;
+        const a = atuais[key] ?? { dx: 0, dy: 0 };
+        const alvo = alvos[key] ?? { dx: 0, dy: 0 };
+        const ndx = a.dx + (alvo.dx - a.dx) * lerp;
+        const ndy = a.dy + (alvo.dy - a.dy) * lerp;
+        novo[key] = { dx: ndx, dy: ndy };
+        if (Math.abs(ndx - a.dx) > 0.01 || Math.abs(ndy - a.dy) > 0.01) mudou = true;
+      }
+      deslocRef.current = novo;
+      if (mudou) setDeslocamentos(novo);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [velocidade, casa.nome, fora.nome]);
+
 
   // Jogadas "de enchimento" entre eventos do simulador: passe entre dois
   // companheiros do time com posse, cruzamento, escanteio, lateral, chute
@@ -169,10 +208,22 @@ export function CampoAoVivo({ casa, fora, eventoAtual, cobrancaAtual, modo = "pa
       const tipoSorte = Math.random();
       // ~45% passe curto, 15% passe longo, 12% cruzamento, 8% chute,
       // 8% escanteio, 7% lateral, 5% troca de posse
-      if (tipoSorte < 0.45) {
+      if (tipoSorte < 0.35) {
+        // TRIANGULAÇÃO — passe A→B→C em sequência, jogadores próximos
+        const a = meuTime[Math.floor(Math.random() * meuTime.length)]!;
+        const proxA = meuTime.filter(p => p.id !== a.id && Math.abs(p.y - a.y) < 22 && Math.abs(p.x - a.x) < 30);
+        const b = proxA.length ? proxA[Math.floor(Math.random() * proxA.length)]! : meuTime[Math.floor(Math.random() * meuTime.length)]!;
+        const proxB = meuTime.filter(p => p.id !== a.id && p.id !== b.id && Math.abs(p.y - b.y) < 22);
+        // 3º vértice da triangulação preferencialmente mais à frente
+        const cand = proxB.filter(p => atacaCasa ? p.y < b.y : p.y > b.y);
+        const c = (cand.length ? cand : proxB.length ? proxB : meuTime)[Math.floor(Math.random() * (cand.length || proxB.length || meuTime.length))]!;
+        setBola({ x: a.x, y: a.y });
+        const t1 = setTimeout(() => setBola({ x: b.x, y: b.y }), 280);
+        const t2 = setTimeout(() => setBola({ x: c.x + (Math.random() - 0.5) * 3, y: c.y + (Math.random() - 0.5) * 3 }), 560);
+        animRef.current.push(t1, t2);
+      } else if (tipoSorte < 0.50) {
         // passe curto entre dois companheiros próximos
         const a = meuTime[Math.floor(Math.random() * meuTime.length)]!;
-        // escolhe um companheiro próximo (distância menor)
         const proximos = meuTime.filter(p => p.id !== a.id && Math.abs(p.y - a.y) < 20);
         const b = proximos.length ? proximos[Math.floor(Math.random() * proximos.length)]! : meuTime[Math.floor(Math.random() * meuTime.length)]!;
         setBola({ x: a.x, y: a.y });
@@ -318,38 +369,42 @@ export function CampoAoVivo({ casa, fora, eventoAtual, cobrancaAtual, modo = "pa
   }, [cobrancaAtual?.rodada, cobrancaAtual?.time, modo]);
 
   return (
-    <div className="relative aspect-[5/6] w-full max-w-[220px] mx-auto overflow-hidden rounded-xl border-2 border-white/10 shadow-inner"
-         style={{ background: "linear-gradient(to bottom, var(--color-pitch) 0%, var(--color-pitch-dark) 50%, var(--color-pitch) 100%)" }}>
-      {/* linhas */}
+    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border-2 border-white/10 shadow-inner"
+         style={{ background: "linear-gradient(to right, var(--color-pitch) 0%, var(--color-pitch-dark) 50%, var(--color-pitch) 100%)" }}>
+      {/* linhas do campo (horizontal: meio-de-campo vertical, áreas nas laterais) */}
       <div className="pointer-events-none absolute inset-2 rounded border border-white/25" />
-      <div className="absolute inset-x-2 top-1/2 h-px bg-white/25" />
+      {/* linha de meio-campo (vertical) */}
+      <div className="absolute inset-y-2 left-1/2 w-px bg-white/25" />
+      {/* círculo central */}
       <div className="absolute left-1/2 top-1/2 size-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/25" />
-      <div className="absolute left-1/2 top-1 h-7 w-2/5 -translate-x-1/2 border-x border-b border-white/25" />
-      <div className="absolute left-1/2 bottom-1 h-7 w-2/5 -translate-x-1/2 border-x border-t border-white/25" />
+      {/* área esquerda (gol da casa) */}
+      <div className="absolute top-1/2 left-1 w-7 h-2/5 -translate-y-1/2 border-y border-r border-white/25" />
+      {/* área direita (gol do fora) */}
+      <div className="absolute top-1/2 right-1 w-7 h-2/5 -translate-y-1/2 border-y border-l border-white/25" />
 
-      {/* jogadores (estilo botão: bolinhas com número e cor de raridade, em movimento contínuo) */}
+      {/* jogadores — transpõe internamente: x interno (largura do time) vira top,
+          y interno (eixo de ataque) vira left. Resultado: casa à esquerda, fora à direita. */}
       {todasPosicoes.map(p => {
         const chave = `${p.timeCasa ? "c" : "f"}-${p.id}`;
         const desloc = deslocamentos[chave] ?? { dx: 0, dy: 0 };
-        const xFinal = Math.min(97, Math.max(3, p.x + desloc.dx));
-        const yFinal = Math.min(97, Math.max(3, p.y + desloc.dy));
+        const xInterno = Math.min(97, Math.max(3, p.x + desloc.dx));
+        const yInterno = Math.min(97, Math.max(3, p.y + desloc.dy));
+        // transpor: left = yInterno (campo de ataque), top = xInterno (largura)
+        const leftFinal = yInterno;
+        const topFinal = xInterno;
         return (
           <div
             key={chave}
             className="absolute -translate-x-1/2 -translate-y-1/2"
             style={{
-              left: `${xFinal}%`,
-              top: `${yFinal}%`,
-              transitionProperty: "left, top",
-              transitionDuration: `${INTERVALO_MOVIMENTO_MS[velocidade]}ms`,
-              // easeOut suave em vez de linear — jogadores chegam ao destino
-              // sem aquela sensação mecânica de teletransporte.
-              transitionTimingFunction: "cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+              left: `${leftFinal}%`,
+              top: `${topFinal}%`,
+              // sem transição CSS — o rAF já interpola posição a cada frame
             }}
           >
             <div
               className={cn(
-                "grid size-4 place-items-center rounded-full border text-[6px] font-black text-white shadow",
+                "grid size-5 place-items-center rounded-full border text-[7px] font-black text-white shadow",
                 p.timeCasa ? COR_CASA : COR_FORA,
                 !p.timeCasa && "opacity-90",
                 destaque === p.id && "ring-2 ring-white scale-150 z-10",
@@ -362,12 +417,12 @@ export function CampoAoVivo({ casa, fora, eventoAtual, cobrancaAtual, modo = "pa
         );
       })}
 
-      {/* bola */}
+      {/* bola — também transposta */}
       <div
         className="absolute -translate-x-1/2 -translate-y-1/2 z-20"
         style={{
-          left: `${bola.x}%`,
-          top: `${bola.y}%`,
+          left: `${bola.y}%`,
+          top: `${bola.x}%`,
           transitionProperty: "left, top",
           transitionDuration: "400ms",
           transitionTimingFunction: "cubic-bezier(0.25, 0.1, 0.25, 1)",
@@ -376,11 +431,11 @@ export function CampoAoVivo({ casa, fora, eventoAtual, cobrancaAtual, modo = "pa
         <div className="size-3 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.9),0_1px_3px_rgba(0,0,0,0.5)]" />
       </div>
 
-      {/* legenda dos times */}
+      {/* legenda dos times — casa à esquerda, fora à direita */}
       <div className="absolute top-1 left-1 rounded bg-black/50 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-1">
         <FlagEmoji emoji={casa.bandeira} size={12} /> {casa.nome}
       </div>
-      <div className="absolute bottom-1 right-1 rounded bg-black/50 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-1">
+      <div className="absolute top-1 right-1 rounded bg-black/50 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-1">
         <FlagEmoji emoji={fora.bandeira} size={12} /> {fora.nome}
       </div>
     </div>

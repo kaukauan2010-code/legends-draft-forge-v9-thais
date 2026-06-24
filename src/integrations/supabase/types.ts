@@ -168,7 +168,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           id: string
-          player_id: string
+          player_id?: string
           updated_at?: string
         }
         Update: {

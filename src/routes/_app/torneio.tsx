@@ -1098,6 +1098,55 @@ function extrairGols(eventos: EventoJogo[], lado: "casa" | "fora"): { nome: stri
     });
 }
 
+// 6 zonas do gol (porcentagens dentro do retângulo da trave): cantos superiores,
+// meio alto/baixo, cantos inferiores. Posição do chute deriva do nome+rodada
+// (estável entre re-renders); luva é o canto OPOSTO se foi gol, ou a mesma zona
+// se o goleiro pegou.
+const ZONAS_PENALTI = [
+  { x: 18, y: 30 }, { x: 50, y: 25 }, { x: 82, y: 30 },
+  { x: 22, y: 65 }, { x: 50, y: 70 }, { x: 78, y: 65 },
+];
+function posicoesPenalti(cob: CobrancaPenalti): { bola: { x: number; y: number }; luva: { x: number; y: number } } {
+  const seed = `${cob.jogador}|${cob.rodada}|${cob.time}`;
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+  const idx = Math.abs(h) % 6;
+  const bola = ZONAS_PENALTI[idx]!;
+  const luva = cob.acertou ? ZONAS_PENALTI[(idx + 3) % 6]! : bola;
+  return { bola, luva };
+}
+
+function TimePenaltisLista({ nome, bandeira, todas, feitas, alinhamento }: {
+  nome: string; bandeira: string; todas: CobrancaPenalti[]; feitas: CobrancaPenalti[]; alinhamento: "esquerda" | "direita";
+}) {
+  return (
+    <div className={cn("bg-white/5 rounded p-2 border border-white/10", alinhamento === "direita" && "text-right")}>
+      <div className={cn("flex items-center gap-1.5 mb-1.5", alinhamento === "direita" && "flex-row-reverse")}>
+        <FlagEmoji emoji={bandeira} size={14} />
+        <span className="text-[10px] font-bold uppercase tracking-widest truncate">{nome}</span>
+      </div>
+      <ul className="space-y-0.5">
+        {todas.map((c, i) => {
+          const concluida = feitas.includes(c);
+          return (
+            <li key={i} className={cn("flex items-center gap-1.5 text-[10px]", alinhamento === "direita" && "flex-row-reverse")}>
+              <span className={cn(
+                "size-2 rounded-sm shrink-0",
+                !concluida ? "bg-white/10" : c.acertou ? "bg-pen-goal" : "bg-pen-miss",
+              )} />
+              <span className={cn("flex-1 truncate", !concluida && "text-foreground/40")}>{c.rodada}º · {c.jogador}</span>
+              {concluida && (
+                <span className={cn("text-[8px] font-bold shrink-0", c.acertou ? "text-pen-goal" : "text-pen-miss")}>
+                  {c.acertou ? "GOL" : "ERRO"}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+
 function tituloFase(f: string): string {
   return {
     grupos: "Fase de Grupos", oitavas: "Oitavas de Final", quartas: "Quartas de Final",

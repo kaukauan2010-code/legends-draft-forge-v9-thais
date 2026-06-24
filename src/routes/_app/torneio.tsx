@@ -1185,14 +1185,14 @@ function MinhaSelecaoLateral({ meu }: { meu: Time }) {
   });
   return (
     <section className="rounded-2xl border border-primary/40 bg-card p-3">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="font-display uppercase text-xs tracking-widest text-primary">Minha seleção</h2>
-        <span className="text-[9px] uppercase tracking-widest text-muted-foreground">{meu.formacao.nome}</span>
-      </div>
-      <div className="grid grid-cols-3 gap-1 mb-3 rounded-lg bg-secondary/40 p-2">
-        <Stat label="Força" value={st.forca} />
-        <Stat label="Ataque" value={st.ataque} />
-        <Stat label="Defesa" value={st.defesa} />
+      <div className="flex items-center justify-between gap-2 mb-2 rounded-md bg-secondary/40 px-2 py-1.5">
+        <span className="font-display uppercase text-[10px] tracking-widest text-primary shrink-0">Minha força</span>
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="flex items-center gap-1"><span className="text-muted-foreground uppercase tracking-widest text-[8px]">F</span><span className="font-display font-black tabular-nums">{st.forca}</span></span>
+          <span className="flex items-center gap-1"><span className="text-muted-foreground uppercase tracking-widest text-[8px]">A</span><span className="font-display font-black tabular-nums">{st.ataque}</span></span>
+          <span className="flex items-center gap-1"><span className="text-muted-foreground uppercase tracking-widest text-[8px]">D</span><span className="font-display font-black tabular-nums">{st.defesa}</span></span>
+          <span className="text-[9px] uppercase tracking-widest text-muted-foreground">{meu.formacao.nome}</span>
+        </div>
       </div>
       <ul className="space-y-1">
         {ordenados.map(j => (

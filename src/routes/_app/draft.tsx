@@ -124,7 +124,8 @@ function Draft() {
       </div>
 
       {/* GRID PRINCIPAL: lista de seleção | campo | escalação */}
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr_220px] gap-3">
+
 
         {/* COL 1: Jogadores disponíveis da seleção sorteada */}
         <div className="rounded-xl border border-border bg-card p-2.5">

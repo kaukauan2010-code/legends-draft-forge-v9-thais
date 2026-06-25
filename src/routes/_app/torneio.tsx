@@ -136,6 +136,53 @@ function Torneio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.historicoJogos.length, s.fase, user]);
 
+  // Registra estatísticas/conquistas para QUALQUER partida nova no histórico
+  // que ainda não tenha sido registrada — incluindo partidas que terminaram
+  // enquanto o usuário estava em outra tela (navegou pra conquistas, voltou).
+  // O índice "ultimo registrado" fica em localStorage chaveado pelo partidaId
+  // da campanha — sem isso, partidas terminadas durante navegação sumiam.
+  useEffect(() => {
+    if (!user) return;
+    const st = useCampanha.getState();
+    if (!st.partidaId || !st.config) return;
+    const total = st.historicoJogos.length;
+    if (total === 0) return;
+    const chave = `wcd-stats-${st.partidaId}`;
+    const ultimoStr = typeof window !== "undefined" ? localStorage.getItem(chave) : null;
+    const ultimo = ultimoStr ? Number(ultimoStr) : 0;
+    if (ultimo >= total) return;
+    const pendentes = st.historicoJogos.slice(ultimo);
+    (async () => {
+      for (let i = 0; i < pendentes.length; i++) {
+        const h = pendentes[i]!;
+        const empate = h.empate ?? false;
+        const venceu = !empate && h.minhaVitoria;
+        const idxGlobal = ultimo + i;
+        const ultimaDoConjunto = idxGlobal === total - 1;
+        const encerrou = ultimaDoConjunto && (st.fase === "campeao" || st.fase === "eliminado");
+        const lend = st.escalacao.filter(j => j.raridade === "lendario").length;
+        const improv = st.escalacao.filter(j => j.improvisado).length;
+        try {
+          const novas = await registrarPartida({
+            vitoria: venceu, empate,
+            golsMeu: h.resultado.golsCasa, golsAdv: h.resultado.golsFora,
+            formacaoId: st.config!.formacaoId, selecoesUsadas: st.selecoesUsadas,
+            jogadoresLendariosEscalados: lend, improvisados: improv,
+            foiPenaltis: !!h.penaltis, venceuPenaltis: h.penaltis ? venceu : undefined,
+            campanhaEncerrada: encerrou, campeao: encerrou && st.fase === "campeao",
+            modo: st.config!.modo,
+            trocasUsadasNestaCompanha: encerrou ? (st.config!.modo === "classico" ? 3 : 1) - st.trocasRestantes : undefined,
+          });
+          novas.forEach(c => toast.success(`🏆 Conquista desbloqueada: ${c.nome}`, { duration: 4000 }));
+        } catch (e) {
+          console.error("[torneio] erro registrando partida", e);
+        }
+      }
+      if (typeof window !== "undefined") localStorage.setItem(chave, String(total));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.historicoJogos.length, s.fase, user]);
+
   // Inicia a contagem regressiva visível antes da próxima partida automática.
   // Substitui o antigo setTimeout silencioso por um setInterval que atualiza
   // contagemAuto a cada segundo, permitindo mostrar a barra de progresso.
@@ -194,34 +241,9 @@ function Torneio() {
         clearInterval(intervaloRef.current!);
         const estadoPos = useCampanha.getState();
         const ultimoJogo = estadoPos.historicoJogos[estadoPos.historicoJogos.length - 1];
-        const campanhaEncerrada = estadoPos.fase === "campeao" || estadoPos.fase === "eliminado";
-        const lendariosNaEscalacao = estadoPos.escalacao.filter(j => j.raridade === "lendario").length;
-        const improvisadosNaEscalacao = estadoPos.escalacao.filter(j => j.improvisado).length;
-        if (user && ultimoJogo) {
-          const empateReal = res.golsCasa === res.golsFora && !ultimoJogo.penaltis;
-          const vitoriaReal = !empateReal && ultimoJogo.minhaVitoria;
-          registrarPartida({
-            vitoria: vitoriaReal,
-            empate: empateReal,
-            golsMeu: res.golsCasa,
-            golsAdv: res.golsFora,
-            formacaoId: estadoPos.config?.formacaoId ?? "",
-            selecoesUsadas: estadoPos.selecoesUsadas,
-            jogadoresLendariosEscalados: lendariosNaEscalacao,
-            improvisados: improvisadosNaEscalacao,
-            foiPenaltis: !!ultimoJogo.penaltis,
-            venceuPenaltis: ultimoJogo.penaltis ? ultimoJogo.minhaVitoria : undefined,
-            campanhaEncerrada,
-            campeao: estadoPos.fase === "campeao",
-            modo: estadoPos.config?.modo,
-            trocasUsadasNestaCompanha: campanhaEncerrada
-              ? (estadoPos.config?.modo === "classico" ? 3 : 1) - estadoPos.trocasRestantes
-              : undefined,
-            rerollsUsadosNestaCompanha: undefined,
-          }).then(novas => {
-            novas.forEach(c => toast.success(`🏆 Conquista desbloqueada: ${c.nome}`, { duration: 4000 }));
-          });
-        }
+        // Stats/conquistas são registradas pelo useEffect que observa
+        // historicoJogos.length — mesmo se o usuário navegar para fora antes
+        // da animação terminar, o registro vai acontecer ao reentrar.
         // Se a partida foi para pênaltis, reproduz a disputa cobrança a cobrança
         // antes de fechar a tela de partida ao vivo. O jogador pode ser "casa" ou
         // "fora" dependendo de como o confronto foi montado no chaveamento.
@@ -841,7 +863,7 @@ function Torneio() {
                       <span className={cn("font-bold", RARIDADE_TEXT_CLASS[j.raridade])}>{RARIDADE_LABEL[j.raridade]}</span>
                     </div>
                   </div>
-                  <div className="font-display text-2xl font-black">{j.forcaEfetiva}</div>
+                  <div className="font-display text-2xl font-black">{j.forca}</div>
                 </div>
               ))}
             </div>
@@ -1209,7 +1231,7 @@ function MinhaSelecaoLateral({ meu }: { meu: Time }) {
                 <span className={cn("font-bold", RARIDADE_TEXT_CLASS[j.raridade])}>{RARIDADE_LABEL[j.raridade]}</span>
               </div>
             </div>
-            <span className="font-display text-sm font-black tabular-nums">{j.forcaEfetiva}</span>
+            <span className="font-display text-sm font-black tabular-nums">{j.forca}</span>
           </li>
         ))}
       </ul>
@@ -1243,7 +1265,7 @@ function TimeEscalacao({ time, titulo }: { time: Time; titulo: string }) {
                 <span className={cn("font-bold", RARIDADE_TEXT_CLASS[j.raridade])}>{RARIDADE_LABEL[j.raridade]}</span>
               </div>
             </div>
-            <span className="font-display text-xs font-black tabular-nums">{j.forcaEfetiva}</span>
+            <span className="font-display text-xs font-black tabular-nums">{j.forca}</span>
           </li>
         ))}
       </ul>

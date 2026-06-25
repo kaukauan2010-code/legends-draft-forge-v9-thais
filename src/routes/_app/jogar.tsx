@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCampanha, type Modo } from "@/lib/campanha";
 import { LISTA_FORMACOES, type FormacaoId } from "@/lib/formacoes";
 import { MiniCampo } from "@/components/MiniCampo";
@@ -16,8 +16,27 @@ export const Route = createFileRoute("/_app/jogar")({
   component: Jogar,
 });
 
+// Hook auxiliar: se há campanha em andamento, redireciona para a tela apropriada
+// (draft se escalação incompleta, torneio se já entrou na fase de torneio).
+// Sem isso, sair pra /conquistas e clicar de novo em "Jogar" wipea a partida.
+function useRedirectSeCampanhaEmAndamento(navigate: ReturnType<typeof useNavigate>) {
+  useEffect(() => {
+    const checar = () => {
+      const st = useCampanha.getState();
+      if (!st.ativa || !st.config) return;
+      if (st.fase === "campeao" || st.fase === "eliminado") return;
+      if (st.escalacao.length < 11) navigate({ to: "/draft", replace: true });
+      else navigate({ to: "/torneio", replace: true });
+    };
+    if (useCampanha.persist.hasHydrated()) { checar(); return; }
+    const unsub = useCampanha.persist.onFinishHydration(checar);
+    return () => unsub();
+  }, [navigate]);
+}
+
 function Jogar() {
   const navigate = useNavigate();
+  useRedirectSeCampanhaEmAndamento(navigate);
   const iniciar = useCampanha(s => s.iniciar);
   const [formacaoId, setFormacaoId] = useState<FormacaoId>("4-3-3");
   const [estrategia, setEstrategia] = useState<Estrategia>("equilibrada");

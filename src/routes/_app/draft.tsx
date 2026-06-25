@@ -22,15 +22,16 @@ function Draft() {
   const s = useCampanha();
   const [tempo, setTempo] = useState(30);
   const [slotParaExcluir, setSlotParaExcluir] = useState<string | null>(null);
-  // Animação visual de sorteio: passa 10 bandeiras em 1.5s antes de revelar a seleção real
-  const [sorteando, setSorteando] = useState<string | null>(null);
+  // Animação visual de sorteio: passa 10 seleções (bandeira + nome + ano) em ~1.5s
+  const [sorteando, setSorteando] = useState<{ bandeira: string; nome: string; ano?: number | string } | null>(null);
   const sortearAnim = () => {
     if (sorteando || s.selecaoAtual || s.jogadorPendente) return;
     const pool = SELECOES.slice().sort(() => Math.random() - 0.5);
     const total = 10;
     const dur = 1500;
     let i = 0;
-    setSorteando(pool[0]?.bandeira ?? "🏳️");
+    const primeira = pool[0]!;
+    setSorteando({ bandeira: primeira.bandeira, nome: primeira.nome, ano: primeira.ano });
     const tick = setInterval(() => {
       i++;
       if (i >= total) {
@@ -39,7 +40,8 @@ function Draft() {
         s.sortearProxima();
         return;
       }
-      setSorteando(pool[i % pool.length]?.bandeira ?? "🏳️");
+      const cur = pool[i % pool.length]!;
+      setSorteando({ bandeira: cur.bandeira, nome: cur.nome, ano: cur.ano });
     }, dur / total);
   };
 
@@ -90,6 +92,9 @@ function Draft() {
   const stats = statsEscalacao(s.escalacao);
   const limiteTrocas = s.config.modo === "classico" ? 3 : 1;
   const limiteRerolls = s.config.modo === "classico" ? 3 : 1;
+  // Almanaque: esconde raridade, força do jogador e estatísticas do time
+  // enquanto a escalação não estiver completa (11/11). Quando completa, revela.
+  const esconder = s.config.modo === "almanaque" && s.escalacao.length < 11;
 
   // Lista de slots (ordenada da defesa pro ataque) para mostrar
   const slotsOrdenados = [...formacao.slots].sort((a, b) => b.y - a.y);
@@ -123,9 +128,9 @@ function Draft() {
             </div>
           </div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <MiniStat icon={<Star className="size-2.5" />} label="Força" value={stats.forca} />
-            <MiniStat icon={<Sword className="size-2.5" />} label="Atk" value={stats.ataque} />
-            <MiniStat icon={<Shield className="size-2.5" />} label="Def" value={stats.defesa} />
+            <MiniStat icon={<Star className="size-2.5" />} label="Força" value={esconder ? "?" : stats.forca} />
+            <MiniStat icon={<Sword className="size-2.5" />} label="Atk" value={esconder ? "?" : stats.ataque} />
+            <MiniStat icon={<Shield className="size-2.5" />} label="Def" value={esconder ? "?" : stats.defesa} />
             <div className="w-px h-6 bg-border" />
             <MiniStat icon={<Dices className="size-2.5" />} label="Rerolls" value={`${s.rerollsRestantes}/${limiteRerolls}`} />
             <MiniStat icon={<Trash2 className="size-2.5" />} label="Trocas" value={`${s.trocasRestantes}/${limiteTrocas}`} />
@@ -180,10 +185,15 @@ function Draft() {
               <Button
                 onClick={sortearAnim}
                 disabled={!!sorteando}
-                className="h-8 w-full font-display uppercase italic tracking-widest font-black text-[10px]"
+                className="h-auto min-h-9 w-full font-display uppercase italic tracking-widest font-black text-[10px] py-1.5"
               >
-                <Shuffle className={cn("size-3 mr-1.5", sorteando && "animate-spin")} />
-                {sorteando ? `Sorteando... ${sorteando}` : "Sortear seleção"}
+                <Dices className={cn("size-3 mr-1.5 shrink-0", sorteando && "animate-spin")} />
+                {sorteando ? (
+                  <span className="flex items-center gap-1.5 truncate">
+                    <FlagEmoji emoji={sorteando.bandeira} size={14} />
+                    <span className="truncate">{sorteando.nome}{sorteando.ano ? ` ${sorteando.ano}` : ""}</span>
+                  </span>
+                ) : "Sortear seleção"}
               </Button>
               {s.escalacao.length === 0 && (
                 <Button
@@ -213,8 +223,8 @@ function Draft() {
                   const jaEscalado = s.nomesJaEscolhidos.includes(j.nome);
                   const compativel = !jaEscalado && posicoesCompativeis(j.posicao).some(p => posicoesLivres.has(p));
                   const ehPendente = pendente?.nome === j.nome;
-                  const cor = false ? "border-muted-foreground/40" : RARIDADE_BORDER_CLASS[j.raridade];
-                  const textoCor = false ? "text-muted-foreground" : RARIDADE_TEXT_CLASS[j.raridade];
+                  const cor = esconder ? "border-muted-foreground/40" : RARIDADE_BORDER_CLASS[j.raridade];
+                  const textoCor = esconder ? "text-muted-foreground" : RARIDADE_TEXT_CLASS[j.raridade];
                   return (
                     <li key={j.numero + j.nome} className="relative">
                       <button
@@ -237,12 +247,10 @@ function Draft() {
                         <div className="flex-1 min-w-0">
                           <div className="font-bold text-[10px] leading-tight truncate">{j.nome}</div>
                           <div className={cn("text-[8px] font-bold uppercase tracking-widest", textoCor)}>
-                            {j.posicao}{!false && ` · ${RARIDADE_LABEL[j.raridade]}`}
+                            {j.posicao}{!esconder && ` · ${RARIDADE_LABEL[j.raridade]}`}
                           </div>
                         </div>
-                        {!false && (
-                          <span className="font-display text-sm font-black shrink-0">{j.forca}</span>
-                        )}
+                        <span className="font-display text-sm font-black shrink-0">{esconder ? "?" : j.forca}</span>
                       </button>
                       {jaEscalado && (
                         <div className="absolute inset-0 flex items-center justify-center gap-1 rounded text-[9px] font-bold uppercase tracking-widest text-muted-foreground bg-card/80">
@@ -278,7 +286,7 @@ function Draft() {
               formacao={formacao}
               escalacao={s.escalacao}
               posicaoAlvo={pendente?.posicao}
-              esconderRaridade={false}
+              esconderRaridade={esconder}
               onSlotClick={pendente ? (slotId) => {
                 const ok = s.posicionarEm(slotId);
                 if (ok) toast.success(`${pendente.nome} escalado!`);
@@ -304,7 +312,7 @@ function Draft() {
                   className={cn(
                     "flex items-center gap-1.5 rounded border-l-2 px-2 py-1 text-[10px] transition-all",
                     j
-                      ? (false ? "border-muted-foreground/40 bg-secondary/60" : `${RARIDADE_BORDER_CLASS[j.raridade]} bg-secondary/60`) + " cursor-pointer hover:opacity-80"
+                      ? (esconder ? "border-muted-foreground/40 bg-secondary/60" : `${RARIDADE_BORDER_CLASS[j.raridade]} bg-secondary/60`) + " cursor-pointer hover:opacity-80"
                       : "border-border/40 border-dashed text-muted-foreground",
                   )}
                 >
@@ -313,13 +321,13 @@ function Draft() {
                     <>
                       <div className="flex-1 min-w-0">
                         <div className="font-bold truncate text-[10px] leading-tight">{j.nome}</div>
-                        {!false && (
+                        {!esconder && (
                           <div className={cn("text-[8px] font-bold uppercase tracking-widest", RARIDADE_TEXT_CLASS[j.raridade])}>
                             {RARIDADE_LABEL[j.raridade]}
                           </div>
                         )}
                       </div>
-                      {!false && <span className="font-display text-xs font-black shrink-0">{j.forca}</span>}
+                      <span className="font-display text-xs font-black shrink-0">{esconder ? "?" : j.forca}</span>
                       <Trash2 className="size-3 text-muted-foreground shrink-0" />
                     </>
                   ) : (

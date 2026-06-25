@@ -22,15 +22,16 @@ function Draft() {
   const s = useCampanha();
   const [tempo, setTempo] = useState(30);
   const [slotParaExcluir, setSlotParaExcluir] = useState<string | null>(null);
-  // Animação visual de sorteio: passa 10 bandeiras em 1.5s antes de revelar a seleção real
-  const [sorteando, setSorteando] = useState<string | null>(null);
+  // Animação visual de sorteio: passa 10 seleções (bandeira + nome + ano) em ~1.5s
+  const [sorteando, setSorteando] = useState<{ bandeira: string; nome: string; ano?: number | string } | null>(null);
   const sortearAnim = () => {
     if (sorteando || s.selecaoAtual || s.jogadorPendente) return;
     const pool = SELECOES.slice().sort(() => Math.random() - 0.5);
     const total = 10;
     const dur = 1500;
     let i = 0;
-    setSorteando(pool[0]?.bandeira ?? "🏳️");
+    const primeira = pool[0]!;
+    setSorteando({ bandeira: primeira.bandeira, nome: primeira.nome, ano: primeira.ano });
     const tick = setInterval(() => {
       i++;
       if (i >= total) {
@@ -39,7 +40,8 @@ function Draft() {
         s.sortearProxima();
         return;
       }
-      setSorteando(pool[i % pool.length]?.bandeira ?? "🏳️");
+      const cur = pool[i % pool.length]!;
+      setSorteando({ bandeira: cur.bandeira, nome: cur.nome, ano: cur.ano });
     }, dur / total);
   };
 

@@ -156,10 +156,13 @@ export function useConquistas() {
 
   const conquistasComProgresso: ConquistaComProgresso[] = calcularProgresso(stats, desbloqueadasIds);
 
+  // totalDesbloqueadas sempre conta apenas IDs únicos (Set garante unicidade)
+  const totalDesbloqueadas = desbloqueadasIds.size;
+
   return {
     stats,
     conquistas: conquistasComProgresso,
-    totalDesbloqueadas: desbloqueadasIds.size,
+    totalDesbloqueadas,
     carregando,
     registrarPartida,
   };

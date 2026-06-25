@@ -241,34 +241,9 @@ function Torneio() {
         clearInterval(intervaloRef.current!);
         const estadoPos = useCampanha.getState();
         const ultimoJogo = estadoPos.historicoJogos[estadoPos.historicoJogos.length - 1];
-        const campanhaEncerrada = estadoPos.fase === "campeao" || estadoPos.fase === "eliminado";
-        const lendariosNaEscalacao = estadoPos.escalacao.filter(j => j.raridade === "lendario").length;
-        const improvisadosNaEscalacao = estadoPos.escalacao.filter(j => j.improvisado).length;
-        if (user && ultimoJogo) {
-          const empateReal = res.golsCasa === res.golsFora && !ultimoJogo.penaltis;
-          const vitoriaReal = !empateReal && ultimoJogo.minhaVitoria;
-          registrarPartida({
-            vitoria: vitoriaReal,
-            empate: empateReal,
-            golsMeu: res.golsCasa,
-            golsAdv: res.golsFora,
-            formacaoId: estadoPos.config?.formacaoId ?? "",
-            selecoesUsadas: estadoPos.selecoesUsadas,
-            jogadoresLendariosEscalados: lendariosNaEscalacao,
-            improvisados: improvisadosNaEscalacao,
-            foiPenaltis: !!ultimoJogo.penaltis,
-            venceuPenaltis: ultimoJogo.penaltis ? ultimoJogo.minhaVitoria : undefined,
-            campanhaEncerrada,
-            campeao: estadoPos.fase === "campeao",
-            modo: estadoPos.config?.modo,
-            trocasUsadasNestaCompanha: campanhaEncerrada
-              ? (estadoPos.config?.modo === "classico" ? 3 : 1) - estadoPos.trocasRestantes
-              : undefined,
-            rerollsUsadosNestaCompanha: undefined,
-          }).then(novas => {
-            novas.forEach(c => toast.success(`🏆 Conquista desbloqueada: ${c.nome}`, { duration: 4000 }));
-          });
-        }
+        // Stats/conquistas são registradas pelo useEffect que observa
+        // historicoJogos.length — mesmo se o usuário navegar para fora antes
+        // da animação terminar, o registro vai acontecer ao reentrar.
         // Se a partida foi para pênaltis, reproduz a disputa cobrança a cobrança
         // antes de fechar a tela de partida ao vivo. O jogador pode ser "casa" ou
         // "fora" dependendo de como o confronto foi montado no chaveamento.

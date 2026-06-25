@@ -92,6 +92,9 @@ function Draft() {
   const stats = statsEscalacao(s.escalacao);
   const limiteTrocas = s.config.modo === "classico" ? 3 : 1;
   const limiteRerolls = s.config.modo === "classico" ? 3 : 1;
+  // Almanaque: esconde raridade, força do jogador e estatísticas do time
+  // enquanto a escalação não estiver completa (11/11). Quando completa, revela.
+  const esconder = s.config.modo === "almanaque" && s.escalacao.length < 11;
 
   // Lista de slots (ordenada da defesa pro ataque) para mostrar
   const slotsOrdenados = [...formacao.slots].sort((a, b) => b.y - a.y);

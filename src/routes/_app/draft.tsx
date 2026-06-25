@@ -286,7 +286,7 @@ function Draft() {
               formacao={formacao}
               escalacao={s.escalacao}
               posicaoAlvo={pendente?.posicao}
-              esconderRaridade={false}
+              esconderRaridade={esconder}
               onSlotClick={pendente ? (slotId) => {
                 const ok = s.posicionarEm(slotId);
                 if (ok) toast.success(`${pendente.nome} escalado!`);

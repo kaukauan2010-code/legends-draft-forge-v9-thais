@@ -128,9 +128,9 @@ function Draft() {
             </div>
           </div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <MiniStat icon={<Star className="size-2.5" />} label="Força" value={stats.forca} />
-            <MiniStat icon={<Sword className="size-2.5" />} label="Atk" value={stats.ataque} />
-            <MiniStat icon={<Shield className="size-2.5" />} label="Def" value={stats.defesa} />
+            <MiniStat icon={<Star className="size-2.5" />} label="Força" value={esconder ? "?" : stats.forca} />
+            <MiniStat icon={<Sword className="size-2.5" />} label="Atk" value={esconder ? "?" : stats.ataque} />
+            <MiniStat icon={<Shield className="size-2.5" />} label="Def" value={esconder ? "?" : stats.defesa} />
             <div className="w-px h-6 bg-border" />
             <MiniStat icon={<Dices className="size-2.5" />} label="Rerolls" value={`${s.rerollsRestantes}/${limiteRerolls}`} />
             <MiniStat icon={<Trash2 className="size-2.5" />} label="Trocas" value={`${s.trocasRestantes}/${limiteTrocas}`} />

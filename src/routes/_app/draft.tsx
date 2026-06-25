@@ -185,10 +185,15 @@ function Draft() {
               <Button
                 onClick={sortearAnim}
                 disabled={!!sorteando}
-                className="h-8 w-full font-display uppercase italic tracking-widest font-black text-[10px]"
+                className="h-auto min-h-9 w-full font-display uppercase italic tracking-widest font-black text-[10px] py-1.5"
               >
-                <Shuffle className={cn("size-3 mr-1.5", sorteando && "animate-spin")} />
-                {sorteando ? `Sorteando... ${sorteando}` : "Sortear seleção"}
+                <Dices className={cn("size-3 mr-1.5 shrink-0", sorteando && "animate-spin")} />
+                {sorteando ? (
+                  <span className="flex items-center gap-1.5 truncate">
+                    <FlagEmoji emoji={sorteando.bandeira} size={14} />
+                    <span className="truncate">{sorteando.nome}{sorteando.ano ? ` ${sorteando.ano}` : ""}</span>
+                  </span>
+                ) : "Sortear seleção"}
               </Button>
               {s.escalacao.length === 0 && (
                 <Button

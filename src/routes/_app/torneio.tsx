@@ -841,7 +841,7 @@ function Torneio() {
                       <span className={cn("font-bold", RARIDADE_TEXT_CLASS[j.raridade])}>{RARIDADE_LABEL[j.raridade]}</span>
                     </div>
                   </div>
-                  <div className="font-display text-2xl font-black">{j.forcaEfetiva}</div>
+                  <div className="font-display text-2xl font-black">{j.forca}</div>
                 </div>
               ))}
             </div>

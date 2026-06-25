@@ -223,8 +223,8 @@ function Draft() {
                   const jaEscalado = s.nomesJaEscolhidos.includes(j.nome);
                   const compativel = !jaEscalado && posicoesCompativeis(j.posicao).some(p => posicoesLivres.has(p));
                   const ehPendente = pendente?.nome === j.nome;
-                  const cor = false ? "border-muted-foreground/40" : RARIDADE_BORDER_CLASS[j.raridade];
-                  const textoCor = false ? "text-muted-foreground" : RARIDADE_TEXT_CLASS[j.raridade];
+                  const cor = esconder ? "border-muted-foreground/40" : RARIDADE_BORDER_CLASS[j.raridade];
+                  const textoCor = esconder ? "text-muted-foreground" : RARIDADE_TEXT_CLASS[j.raridade];
                   return (
                     <li key={j.numero + j.nome} className="relative">
                       <button
@@ -247,12 +247,10 @@ function Draft() {
                         <div className="flex-1 min-w-0">
                           <div className="font-bold text-[10px] leading-tight truncate">{j.nome}</div>
                           <div className={cn("text-[8px] font-bold uppercase tracking-widest", textoCor)}>
-                            {j.posicao}{!false && ` · ${RARIDADE_LABEL[j.raridade]}`}
+                            {j.posicao}{!esconder && ` · ${RARIDADE_LABEL[j.raridade]}`}
                           </div>
                         </div>
-                        {!false && (
-                          <span className="font-display text-sm font-black shrink-0">{j.forca}</span>
-                        )}
+                        <span className="font-display text-sm font-black shrink-0">{esconder ? "?" : j.forca}</span>
                       </button>
                       {jaEscalado && (
                         <div className="absolute inset-0 flex items-center justify-center gap-1 rounded text-[9px] font-bold uppercase tracking-widest text-muted-foreground bg-card/80">

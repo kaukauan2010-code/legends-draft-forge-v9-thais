@@ -312,7 +312,7 @@ function Draft() {
                   className={cn(
                     "flex items-center gap-1.5 rounded border-l-2 px-2 py-1 text-[10px] transition-all",
                     j
-                      ? (false ? "border-muted-foreground/40 bg-secondary/60" : `${RARIDADE_BORDER_CLASS[j.raridade]} bg-secondary/60`) + " cursor-pointer hover:opacity-80"
+                      ? (esconder ? "border-muted-foreground/40 bg-secondary/60" : `${RARIDADE_BORDER_CLASS[j.raridade]} bg-secondary/60`) + " cursor-pointer hover:opacity-80"
                       : "border-border/40 border-dashed text-muted-foreground",
                   )}
                 >
@@ -321,13 +321,13 @@ function Draft() {
                     <>
                       <div className="flex-1 min-w-0">
                         <div className="font-bold truncate text-[10px] leading-tight">{j.nome}</div>
-                        {!false && (
+                        {!esconder && (
                           <div className={cn("text-[8px] font-bold uppercase tracking-widest", RARIDADE_TEXT_CLASS[j.raridade])}>
                             {RARIDADE_LABEL[j.raridade]}
                           </div>
                         )}
                       </div>
-                      {!false && <span className="font-display text-xs font-black shrink-0">{j.forca}</span>}
+                      <span className="font-display text-xs font-black shrink-0">{esconder ? "?" : j.forca}</span>
                       <Trash2 className="size-3 text-muted-foreground shrink-0" />
                     </>
                   ) : (

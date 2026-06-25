@@ -63,11 +63,13 @@ function Dashboard() {
     staleTime: 0,
     gcTime: 0,
     queryFn: async () => {
-      const { count } = await supabase
+      const { data } = await supabase
         .from("conquistas_desbloqueadas")
-        .select("*", { count: "exact", head: true })
+        .select("conquista_id")
         .eq("user_id", user!.id);
-      return count ?? 0;
+      // Conta IDs únicos para evitar duplicatas no banco afetando o número
+      const unicos = new Set((data ?? []).map(c => c.conquista_id));
+      return unicos.size;
     },
   });
 

@@ -99,8 +99,7 @@ function Conquistas() {
           {listaFiltrada.map(c => {
             const Icon = c.desbloqueada ? CheckCircle2 : Lock;
             return (
-              <div
-                key={c.id}
+              <div key={c.id}
                 className={cn(
                   "rounded-xl border-l-4 bg-card p-3 transition-opacity",
                   c.desbloqueada ? TIER_COR[c.tier] : "border-border opacity-60",
@@ -112,15 +111,13 @@ function Conquistas() {
                     <div className="flex items-center justify-between gap-2">
                       <h3 className="font-bold text-sm truncate">{c.nome}</h3>
                       <span className="text-[9px] uppercase tracking-widest text-muted-foreground shrink-0">
-                        {c.valorAtual}/{c.meta}
+                        {c.desbloqueada ? "1/1" : `0/1`}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{c.descricao}</p>
-                    {!c.desbloqueada && (
-                      <div className="mt-1.5 h-1 w-full rounded-full bg-secondary overflow-hidden">
-                        <div className="h-full bg-primary/70" style={{ width: `${c.progresso * 100}%` }} />
-                      </div>
-                    )}
+                    <div className="mt-1.5 h-1 w-full rounded-full bg-secondary overflow-hidden">
+                      <div className="h-full bg-primary/70" style={{ width: c.desbloqueada ? "100%" : `${c.progresso * 100}%` }} />
+                    </div>
                   </div>
                 </div>
               </div>

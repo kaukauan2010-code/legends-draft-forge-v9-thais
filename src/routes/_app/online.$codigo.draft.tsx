@@ -135,7 +135,6 @@ function DraftOnline() {
 
   useEffect(() => {
     if (!sala || !meuDraft || meuDraft.terminou || enviando) return;
-    if (!meuDraft.jogadores_oferecidos && !pendente) return;
     if (tempo <= 0) {
       setPendente(null);
       forcarFimDraftOnline({ data: { salaId: sala.id } })
@@ -368,7 +367,7 @@ function DraftOnline() {
             </div>
             <div className="font-display text-lg font-black leading-none">{meuDraft.trocas_restantes}/{limite}</div>
           </div>
-          {(selecaoAtual || pendente) && (
+          {!meuDraft.terminou && (
             <div className={cn("font-display text-3xl font-black tabular-nums",
               tempo <= 10 ? "text-destructive animate-pulse" : "text-foreground")}>
               00:{tempo.toString().padStart(2, "0")}

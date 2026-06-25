@@ -50,27 +50,40 @@ function Online() {
     if (isAnonymous && !nomeVisitante.trim()) { toast.error("Informe seu nome antes de criar a sala"); return; }
     setBusy(true);
     const competicao = COMPETICOES.find(c => c.id === comp)!;
-    for (let tentativa = 0; tentativa < 5; tentativa++) {
-      const codigo = gerarCodigo();
-      const { data, error } = await supabase.from("salas").insert({
-        codigo, mestre_id: user.id, modo, competicao: comp, max_jogadores: competicao.vagas,
-      }).select("id, codigo").single();
-      if (!error && data) {
-        await supabase.from("sala_jogadores").insert({
-          sala_id: data.id, user_id: user.id, nome: meuNome, slot: 1,
-        });
-        setBusy(false);
-        navigate({ to: "/online/$codigo", params: { codigo: data.codigo } });
-        return;
+    try {
+      for (let tentativa = 0; tentativa < 5; tentativa++) {
+        const codigo = gerarCodigo();
+        const { data, error } = await supabase.from("salas").insert({
+          codigo, mestre_id: user.id, modo, competicao: comp, max_jogadores: competicao.vagas,
+        }).select("id, codigo").single();
+        if (!error && data) {
+          const { error: jErr } = await supabase.from("sala_jogadores").insert({
+            sala_id: data.id, user_id: user.id, nome: meuNome, slot: 1,
+          });
+          if (jErr) {
+            console.error("[online] erro ao entrar como mestre", jErr);
+            toast.error(`Sala criada, mas falhou ao entrar: ${jErr.message}`);
+            setBusy(false);
+            return;
+          }
+          setBusy(false);
+          navigate({ to: "/online/$codigo", params: { codigo: data.codigo } });
+          return;
+        }
+        console.warn("[online] tentativa de criar sala falhou", { tentativa, error });
+        if (error && !String(error.message).toLowerCase().includes("duplicate")) {
+          setBusy(false);
+          toast.error(`Erro ao criar sala: ${error.message}`);
+          return;
+        }
       }
-      if (error && !String(error.message).toLowerCase().includes("duplicate")) {
-        setBusy(false);
-        toast.error(error.message);
-        return;
-      }
+      setBusy(false);
+      toast.error("Não consegui gerar um código único. Tente de novo.");
+    } catch (e: any) {
+      console.error("[online] exceção em criar()", e);
+      setBusy(false);
+      toast.error(`Erro inesperado: ${e?.message ?? e}`);
     }
-    setBusy(false);
-    toast.error("Não consegui gerar um código único. Tente de novo.");
   };
 
   const entrar = async () => {

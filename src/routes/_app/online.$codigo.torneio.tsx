@@ -45,6 +45,7 @@ interface Sala { id: string; codigo: string; mestre_id: string; velocidade: "nor
 interface SlotJogador {
   id: string; sala_id: string; user_id: string | null; nome: string; is_cpu: boolean;
   grupo: string | null; elenco_online: JogadorEscalado[] | null; last_seen_at: string;
+  bandeira: string | null;
 }
 interface SlotGrupo { slot_id: string; user_id: string | null; nome: string; is_cpu: boolean; grupo: string; }
 interface ConfrontoOnline {
@@ -174,6 +175,7 @@ function TorneioOnline() {
   const meuSlot = useMemo(() => slots.find(s => s.user_id === user?.id) ?? null, [slots, user?.id]);
   const slotPorId = useMemo(() => new Map(slots.map(s => [s.id, s])), [slots]);
   const nomeDe = (slotId: string | null) => (slotId ? slotPorId.get(slotId)?.nome ?? "—" : "—");
+  const bandeiraDe = (slotId: string | null) => (slotId ? slotPorId.get(slotId)?.bandeira ?? "🏳️" : "🏳️");
   const estaOffline = (slotId: string | null) => {
     const s = slotId ? slotPorId.get(slotId) : null;
     if (!s || s.is_cpu || !s.user_id) return false;
@@ -595,7 +597,7 @@ function TorneioOnline() {
 
       {/* Classificação dos grupos: meu grupo + todos */}
       {faseAtual === "grupos" && grupos.length > 0 && (
-        <ClassificacaoTabs grupos={grupos} classif={classif} nomeDe={nomeDe} meuSlotId={meuSlot?.id ?? null} />
+        <ClassificacaoTabs grupos={grupos} classif={classif} nomeDe={nomeDe} bandeiraDe={bandeiraDe} meuSlotId={meuSlot?.id ?? null} />
       )}
 
       {/* Bracket de mata-mata */}
@@ -778,9 +780,11 @@ function AguardandoCard({
 // ──────────────────────────────────────────────────────────────
 // Classificação geral: tabs "Meu grupo" / "Todos os grupos"
 // ──────────────────────────────────────────────────────────────
-function ClassificacaoTabs({ grupos, classif, nomeDe, meuSlotId }: {
+function ClassificacaoTabs({ grupos, classif, nomeDe, bandeiraDe, meuSlotId }: {
   grupos: SlotGrupo[]; classif: Record<string, ClassifLinha>;
-  nomeDe: (id: string | null) => string; meuSlotId: string | null;
+  nomeDe: (id: string | null) => string;
+  bandeiraDe: (id: string | null) => string;
+  meuSlotId: string | null;
 }) {
   const [aba, setAba] = useState<"meu" | "todos">("meu");
   const nomesGrupos = Array.from(new Set(grupos.map(g => g.grupo))).sort();
@@ -819,7 +823,9 @@ function ClassificacaoTabs({ grupos, classif, nomeDe, meuSlotId }: {
                     return (
                       <tr key={x.slot_id} className={cn(x.slot_id === meuSlotId && "text-primary font-bold")}>
                         <td className="py-0.5 truncate max-w-[8rem]">
-                          {x.is_cpu ? <Bot className="size-3 inline mr-1" /> : <Crown className="size-3 inline mr-1 text-legendary" />}
+                          {x.is_cpu
+                            ? <Bot className="size-3 inline mr-1 text-muted-foreground" />
+                            : <span className="mr-1 leading-none">{bandeiraDe(x.slot_id)}</span>}
                           {nomeDe(x.slot_id)}
                         </td>
                         <td className="text-center tabular-nums">{c.pontos}</td>

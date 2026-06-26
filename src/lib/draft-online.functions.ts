@@ -124,7 +124,30 @@ async function sortearParaUsuario(
     }
   }
 
-  const selecao: Selecao = sortearSelecao(excluir);
+  // Slots ainda livres na MINHA escalação + nomes bloqueados por todos.
+  // Igual ao modo solo: NÃO podemos entregar uma seleção sem nenhum jogador
+  // utilizável (todos bloqueados ou nenhum cabendo num slot livre).
+  const formacao = FORMACOES[row.formacao_id as FormacaoId];
+  const escalacaoAtual = (row.escolhas as unknown as JogadorEscalado[]) ?? [];
+  const posicoesLivres = new Set(
+    formacao.slots.filter((s) => !escalacaoAtual.some((j) => j.slotId === s.id)).map((s) => s.posicao),
+  );
+  const bloqueados = await nomesBloqueadosNaSala(admin, salaId);
+
+  const tentativasExtras: string[] = [];
+  let selecao: Selecao | null = null;
+  for (let tentativa = 0; tentativa < 10; tentativa++) {
+    const candidata = sortearSelecao([...excluir, ...tentativasExtras]);
+    const utilizaveis = candidata.jogadores.filter(
+      (j) => !bloqueados.has(j.nome) && posicoesCompativeis(j.posicao).some((p) => posicoesLivres.has(p)),
+    );
+    if (utilizaveis.length > 0) { selecao = candidata; break; }
+    tentativasExtras.push(candidata.id);
+  }
+  // Fallback: se mesmo após 10 tentativas todas vieram inúteis, manda a última
+  // mesmo assim — o usuário pode usar reroll. (Caso raríssimo.)
+  if (!selecao) selecao = sortearSelecao([...excluir, ...tentativasExtras.slice(0, -1)]);
+
   const update = {
     jogadores_oferecidos: selecao,
     selecoes_oferecidas: [...row.selecoes_oferecidas, selecao.id],

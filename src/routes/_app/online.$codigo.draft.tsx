@@ -284,6 +284,22 @@ function DraftOnline() {
           <MiniCampo formacao={formacao} escalacao={escalacao} esconderRaridade={false} />
         </section>
 
+        <section className="rounded-2xl border border-border bg-card p-3">
+          <h2 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            Jogadores escolhidos ({escalacao.length}/11)
+          </h2>
+          <ul className="space-y-1">
+            {escalacao.map((j) => (
+              <li key={j.slotId} className="flex items-center gap-2 rounded-md border border-border bg-card/60 px-2 py-1.5 text-xs">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground w-10 shrink-0">{j.posicao}</span>
+                <span className="flex-1 font-bold truncate">{j.nome}</span>
+                <span className={cn("text-[10px] uppercase tracking-widest font-bold", RARIDADE_CSS[j.raridade])}>{j.raridade}</span>
+                <span className="font-display text-sm font-black tabular-nums w-8 text-right">{j.forca}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <AutoIniciarTorneio salaId={sala.id} ativo={todosTerminaram} />
       </div>
     );

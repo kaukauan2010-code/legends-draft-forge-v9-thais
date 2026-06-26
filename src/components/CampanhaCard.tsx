@@ -8,7 +8,15 @@ export interface RodadaSalva {
   texto: string;
   resultado: { eventos: EventoJogo[]; golsCasa: number; golsFora: number };
   minhaVitoria: boolean;
+  empate?: boolean;
   penaltis?: ResultadoPenaltis;
+}
+
+export interface PartidaHistoricoItem {
+  id: string;
+  rodada: RodadaSalva;
+  campanha: any;
+  indice: number;
 }
 
 export function tituloFaseCampanha(f: string): string {
@@ -16,6 +24,104 @@ export function tituloFaseCampanha(f: string): string {
     grupos: "Fase de Grupos", oitavas: "Oitavas de Final", quartas: "Quartas de Final",
     semi: "Semifinal", final: "Final", campeao: "🏆 Campeão", eliminado: "Eliminado",
   }[f] ?? f;
+}
+
+export function partidasDeCampanhas(campanhas: any[], limite = 21): PartidaHistoricoItem[] {
+  return (campanhas ?? [])
+    .flatMap((campanha) => {
+      const rodadas: RodadaSalva[] = Array.isArray(campanha.log) ? campanha.log : [];
+      return rodadas
+        .map((rodada, indice) => ({
+          id: `${campanha.id}-${indice}`,
+          rodada,
+          campanha,
+          indice,
+        }))
+        .reverse();
+    })
+    .slice(0, limite);
+}
+
+export function PartidaHistoricoCard({ item }: { item: PartidaHistoricoItem }) {
+  const { rodada: h, campanha, indice } = item;
+  const [aberto, setAberto] = useState(false);
+  const eventosOrdenados = [...(h.resultado?.eventos ?? [])].sort((a, b) => a.minuto - b.minuto);
+  const rodadasPenalti = h.penaltis
+    ? Array.from(new Set(h.penaltis.cobrancas.map(c => c.rodada))).sort((a, b) => a - b).map(rodada => ({
+        rodada,
+        casa: h.penaltis!.cobrancas.find(c => c.rodada === rodada && c.time === "casa"),
+        fora: h.penaltis!.cobrancas.find(c => c.rodada === rodada && c.time === "fora"),
+      }))
+    : [];
+  const resultado = h.empate ? "Empate" : h.minhaVitoria ? "Vitória" : "Derrota";
+
+  return (
+    <div className={cn("rounded-xl border bg-card overflow-hidden", h.empate ? "border-yellow-500/40" : h.minhaVitoria ? "border-primary/40" : "border-destructive/30")}>
+      <button type="button" onClick={() => setAberto(v => !v)} className="w-full text-left p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className={cn("text-[10px] font-black uppercase tracking-widest", h.empate ? "text-yellow-500" : h.minhaVitoria ? "text-primary" : "text-destructive")}>{resultado}</span>
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground truncate">{h.fase}</span>
+            </div>
+            <div className="mt-1 font-bold text-sm leading-tight truncate">{h.texto}</div>
+            <div className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+              Jogo {indice + 1} · {campanha.modo} · {campanha.formacao} · {new Date(campanha.created_at).toLocaleDateString("pt-BR")}
+            </div>
+          </div>
+          <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform mt-1", aberto && "rotate-180")} />
+        </div>
+      </button>
+
+      {aberto && (
+        <div className="border-t border-border/60 px-3 py-3 space-y-3 animate-enter">
+          <div>
+            <div className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5 flex items-center gap-1">
+              <Zap className="size-3" /> Lance a lance
+            </div>
+            <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+              {eventosOrdenados.map((e, i) => (
+                <div key={i} className={cn(
+                  "text-[11px] leading-snug",
+                  e.tipo === "gol" && "font-bold text-primary",
+                  e.tipo === "cartao" && "text-yellow-500",
+                  e.tipo === "info" && "text-muted-foreground italic",
+                )}>
+                  {e.texto}
+                </div>
+              ))}
+              {!eventosOrdenados.length && <p className="text-xs text-muted-foreground italic">Sem lances salvos.</p>}
+            </div>
+          </div>
+
+          {h.penaltis && (
+            <div>
+              <div className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5 flex items-center gap-1">
+                <Target className="size-3" /> Pênaltis · {h.penaltis.golsCasa}-{h.penaltis.golsFora}
+              </div>
+              <div className="space-y-1">
+                {rodadasPenalti.map(({ rodada, casa, fora }) => (
+                  <div key={rodada} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[11px]">
+                    <div className="flex items-center justify-end gap-1.5 text-right">
+                      <span className="font-medium truncate">{casa?.jogador ?? "—"}</span>
+                      <span className={casa?.acertou ? "text-primary" : "text-destructive"}>{casa ? (casa.acertou ? "⚽" : "❌") : ""}</span>
+                    </div>
+                    <span className="font-mono tabular-nums text-muted-foreground text-[9px] px-1">
+                      {casa?.placarCasa ?? "·"}-{fora?.placarFora ?? "·"}
+                    </span>
+                    <div className="flex items-center justify-start gap-1.5 text-left">
+                      <span className={fora?.acertou ? "text-primary" : "text-destructive"}>{fora ? (fora.acertou ? "⚽" : "❌") : ""}</span>
+                      <span className="font-medium truncate">{fora?.jogador ?? "—"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function CampanhaCard({ p }: { p: any }) {

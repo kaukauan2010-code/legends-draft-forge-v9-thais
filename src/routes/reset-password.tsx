@@ -24,17 +24,16 @@ function ResetPassword() {
   useEffect(() => {
     // O Supabase v2 usa o hash para enviar o token de recovery.
     // O evento PASSWORD_RECOVERY é disparado quando detecta o hash correto.
-    // Precisamos garantir que NÃO redirecionamos para login antes de processar o hash.
-
-    // Verifica se há hash de recovery na URL
     const hash = window.location.hash;
     const hasRecoveryHash = hash.includes("type=recovery") || hash.includes("access_token");
 
     if (!hasRecoveryHash) {
-      // Sem hash de recovery — verifica se já tem sessão ativa
+      // Sem hash de recovery: se já existir sessão (ex: usuário caiu aqui
+      // depois de logar com Google), NÃO mostra o formulário — manda direto
+      // pro dashboard. Sem isso, o login social parece "abrir redefinir senha".
       supabase.auth.getSession().then(({ data }) => {
         if (data.session) {
-          setPronto(true);
+          navigate({ to: "/dashboard", replace: true });
         } else {
           setErro("Link de recuperação inválido ou expirado. Solicite um novo link.");
         }
@@ -44,15 +43,11 @@ function ResetPassword() {
     // Escuta o evento de recovery do Supabase
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") {
-        // Token de recovery detectado — formulário pronto para uso
         setPronto(true);
         setErro(null);
-      } else if (event === "SIGNED_IN" && session) {
-        // Sessão já ativa (ex: usuário voltou à aba)
-        setPronto(true);
-        setErro(null);
-      } else if (event === "SIGNED_OUT" && !pronto) {
-        // Não redireciona — deixa o usuário continuar na tela de reset
+      } else if (event === "SIGNED_IN" && session && !hasRecoveryHash) {
+        // Login normal (não recovery) — sai daqui.
+        navigate({ to: "/dashboard", replace: true });
       }
     });
 

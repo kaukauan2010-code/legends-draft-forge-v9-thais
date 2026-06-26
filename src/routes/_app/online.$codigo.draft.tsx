@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +54,7 @@ function DraftOnline() {
   const [slotParaExcluir, setSlotParaExcluir] = useState<string | null>(null);
   const [verPicksDe, setVerPicksDe] = useState<string | null>(null);
   const [tempo, setTempo] = useState(30);
-  const [iniciandoTorneio, setIniciandoTorneio] = useState(false);
+  // (iniciandoTorneio removido — agora o torneio começa automaticamente via AutoIniciarTorneio)
 
   const [formacaoId, setFormacaoId] = useState<FormacaoId>("4-3-3");
   const [estrategia, setEstrategia] = useState<Estrategia>("equilibrada");
@@ -136,11 +136,21 @@ function DraftOnline() {
   useEffect(() => {
     if (!sala || !meuDraft || meuDraft.terminou || enviando) return;
     if (tempo <= 0) {
-      setPendente(null);
-      forcarFimDraftOnline({ data: { salaId: sala.id } })
-        .then((novo: unknown) => setMeuDraft(novo as SalaDraftRow))
-        .catch((e: Error) => toast.error(e.message));
-      toast.warning("Tempo esgotado — escolha automática");
+      const temSelecaoAtual = !!meuDraft.jogadores_oferecidos;
+      const temPendente = !!pendente;
+      if (!temSelecaoAtual && !temPendente) {
+        // Esgotou o tempo aguardando o "Sortear": sorteia automaticamente.
+        toast.warning("Tempo esgotado — sorteando seleção");
+        sortearSelecaoOnline({ data: { salaId: sala.id, isReroll: false } })
+          .then((novo: unknown) => setMeuDraft(novo as SalaDraftRow))
+          .catch((e: Error) => toast.error(e.message));
+      } else {
+        setPendente(null);
+        forcarFimDraftOnline({ data: { salaId: sala.id } })
+          .then((novo: unknown) => setMeuDraft(novo as SalaDraftRow))
+          .catch((e: Error) => toast.error(e.message));
+        toast.warning("Tempo esgotado — escolha automática");
+      }
       return;
     }
     const t = setTimeout(() => setTempo((x) => x - 1), 1000);
@@ -158,75 +168,31 @@ function DraftOnline() {
 
   const limite = sala.modo === "almanaque" ? 1 : 3;
 
+  const abandonar = async () => {
+    if (!sala || !user) return;
+    if (!confirm("Abandonar a sala? Você perderá o progresso do draft.")) return;
+    await supabase.from("sala_jogadores").delete().eq("sala_id", sala.id).eq("user_id", user.id);
+    navigate({ to: "/online" });
+  };
+
   // ====== ETAPA 0: ainda não escolheu formação/estratégia ======
   if (!meuDraft) {
-    const comecar = async () => {
-      setEnviando(true);
-      try {
-        const criado = await iniciarDraftOnline({
-          data: { salaId: sala.id, formacaoId, estrategia, nomeTime: nomeTime.trim() || "Meu Time" },
-        });
-        setMeuDraft(criado as SalaDraftRow);
-        setTodosDrafts(prev => [...prev.filter(d => d.user_id !== user?.id), criado as SalaDraftRow]);
-      } catch (e) {
-        toast.error((e as Error).message);
-      } finally {
-        setEnviando(false);
-      }
-    };
-
     return (
-      <div className="mx-auto max-w-md px-4 py-6 space-y-6 animate-enter">
-        <header>
-          <h1 className="font-display text-3xl uppercase italic tracking-tight">Seu time online</h1>
-          <p className="text-sm text-muted-foreground">Escolha formação e estratégia antes de entrar no draft simultâneo.</p>
-        </header>
-
-        <section className="space-y-3">
-          <div className="flex items-end justify-between">
-            <h2 className="font-display uppercase tracking-tight text-lg">Formação Tática</h2>
-            <span className="text-[10px] uppercase tracking-widest text-primary">{formacaoId}</span>
-          </div>
-          <MiniCampo formacao={FORMACOES[formacaoId]} escalacao={[]} />
-          <div className="grid grid-cols-3 gap-2">
-            {LISTA_FORMACOES.map(f => (
-              <button key={f.id} onClick={() => setFormacaoId(f.id)}
-                className={cn("rounded-lg border py-3 font-display font-bold uppercase tracking-widest text-xs transition-all",
-                  formacaoId === f.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-secondary text-muted-foreground")}>
-                {f.nome}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <h2 className="font-display uppercase tracking-tight text-lg">Estratégia</h2>
-          <div className="grid grid-cols-3 gap-2">
-            {(["defensiva", "equilibrada", "ofensiva"] as Estrategia[]).map(e => (
-              <button key={e} onClick={() => setEstrategia(e)}
-                className={cn("rounded-lg border py-3 font-bold uppercase text-[10px] tracking-widest",
-                  estrategia === e ? "border-primary bg-primary text-primary-foreground" : "border-border bg-secondary text-muted-foreground")}>
-                {e}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-1.5">
-          <Label>Nome do seu time</Label>
-          <Input value={nomeTime} onChange={e => setNomeTime(e.target.value)} placeholder="Ex: Lendas FC" maxLength={40} />
-        </section>
-
-        <p className="text-[10px] text-muted-foreground text-center">
-          Modo da sala: <span className="font-bold text-primary uppercase">{sala.modo}</span> · {limite} rerolls e {limite} trocas
-        </p>
-
-        <Button onClick={comecar} disabled={enviando} className="w-full h-12 font-display uppercase italic tracking-widest text-base font-black">
-          Entrar no draft
-        </Button>
-      </div>
+      <EscolhaFormacao
+        salaId={sala.id} userId={user?.id ?? null} sala={sala} limite={limite}
+        formacaoId={formacaoId} setFormacaoId={setFormacaoId}
+        estrategia={estrategia} setEstrategia={setEstrategia}
+        nomeTime={nomeTime} setNomeTime={setNomeTime}
+        enviando={enviando} setEnviando={setEnviando}
+        onCriado={(criado) => {
+          setMeuDraft(criado);
+          setTodosDrafts(prev => [...prev.filter(d => d.user_id !== user?.id), criado]);
+        }}
+        onSair={abandonar}
+      />
     );
   }
+
 
   // ====== dados derivados do meu draft ======
   const formacao = FORMACOES[meuDraft.formacao_id as FormacaoId];
@@ -285,30 +251,22 @@ function DraftOnline() {
     }
   };
 
-  // ====== ETAPA FINAL: meu draft terminou — aguardando os outros ======
+  // ====== ETAPA FINAL: meu draft terminou — auto-inicia torneio quando todos terminam ======
   if (meuDraft.terminou) {
-    const ehMestre = user?.id === sala.mestre_id;
-    const iniciarTorneio = async () => {
-      if (!sala || iniciandoTorneio) return;
-      setIniciandoTorneio(true);
-      try {
-        await iniciarTorneioOnline({ data: { salaId: sala.id } });
-        toast.success("Torneio iniciado! Indo para a fase de grupos...");
-      } catch (e) {
-        toast.error((e as Error).message);
-        setIniciandoTorneio(false);
-      }
-    };
     return (
-      <div className="mx-auto max-w-md px-4 py-6 space-y-5 pb-10 animate-enter">
+      <div className="mx-auto max-w-md px-4 py-6 space-y-5 pb-10 animate-enter relative">
+        <Button onClick={abandonar} variant="ghost" size="sm"
+          className="absolute right-3 top-3 text-destructive h-7 px-2 text-[10px] uppercase tracking-widest font-bold z-10">
+          <X className="size-3 mr-1" /> Sair
+        </Button>
         <header className="text-center space-y-2">
           <Hourglass className="mx-auto size-10 text-primary animate-pulse" />
           <h1 className="font-display text-2xl uppercase italic tracking-tight">
-            {todosTerminaram ? "Todo mundo terminou!" : "Aguardando outros jogadores"}
+            {todosTerminaram ? "Todo mundo terminou — iniciando torneio..." : "Aguardando outros jogadores"}
           </h1>
           <p className="text-xs text-muted-foreground">
             {todosTerminaram
-              ? (ehMestre ? "Toque em \"Iniciar torneio\" pra começar a fase de grupos." : "Aguardando o mestre iniciar o torneio.")
+              ? "Você será levado para a fase do torneio em instantes."
               : "Seu time já está escalado. Acompanhe o progresso dos outros jogadores da sala."}
           </p>
         </header>
@@ -326,19 +284,18 @@ function DraftOnline() {
           <MiniCampo formacao={formacao} escalacao={escalacao} esconderRaridade={false} />
         </section>
 
-        {todosTerminaram && ehMestre && (
-          <Button onClick={iniciarTorneio} disabled={iniciandoTorneio}
-            className="w-full h-12 font-display uppercase tracking-widest font-black bg-primary">
-            {iniciandoTorneio ? "Iniciando..." : "Iniciar torneio"}
-          </Button>
-        )}
+        <AutoIniciarTorneio salaId={sala.id} ativo={todosTerminaram} />
       </div>
     );
   }
 
   // ====== LOOP PRINCIPAL DO DRAFT ======
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4 space-y-4">
+    <div className="mx-auto max-w-5xl px-4 py-4 space-y-4 relative">
+      <Button onClick={abandonar} variant="ghost" size="sm"
+        className="absolute right-3 top-3 text-destructive h-7 px-2 text-[10px] uppercase tracking-widest font-bold z-20">
+        <X className="size-3 mr-1" /> Sair
+      </Button>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-widest text-destructive">Draft Online · {sala.codigo}</div>
@@ -368,9 +325,17 @@ function DraftOnline() {
             <div className="font-display text-lg font-black leading-none">{meuDraft.trocas_restantes}/{limite}</div>
           </div>
           {!meuDraft.terminou && (
-            <div className={cn("font-display text-3xl font-black tabular-nums",
-              tempo <= 10 ? "text-destructive animate-pulse" : "text-foreground")}>
-              00:{tempo.toString().padStart(2, "0")}
+            <div className="flex flex-col items-stretch min-w-[140px]">
+              <div className={cn("font-display text-2xl font-black tabular-nums text-center",
+                tempo <= 10 ? "text-destructive animate-pulse" : "text-foreground")}>
+                00:{tempo.toString().padStart(2, "0")}
+              </div>
+              <div className="h-1.5 mt-1 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className={cn("h-full transition-all duration-1000 ease-linear", tempo <= 10 ? "bg-destructive" : "bg-primary")}
+                  style={{ width: `${Math.max(0, Math.min(100, (tempo / 30) * 100))}%` }}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -609,3 +574,139 @@ function PainelPicks({ userId, humanos, draftDe, esconderStats, onClose }: {
     </section>
   );
 }
+
+// Dispara iniciarTorneioOnline assim que todos terminaram. Idempotente no servidor.
+// Qualquer cliente pode acionar — o primeiro vence; os outros recebem erro silencioso.
+function AutoIniciarTorneio({ salaId, ativo }: { salaId: string; ativo: boolean }) {
+  const acionadoRef = useRef(false);
+  useEffect(() => {
+    if (!ativo || acionadoRef.current) return;
+    acionadoRef.current = true;
+    iniciarTorneioOnline({ data: { salaId } }).catch(() => { /* outro cliente já iniciou */ });
+  }, [ativo, salaId]);
+  return null;
+}
+
+// Etapa 0 (escolha de formação) com cronômetro de 30s. Estourou? Envia 4-3-3 + equilibrada.
+function EscolhaFormacao({
+  salaId, userId, sala, limite,
+  formacaoId, setFormacaoId, estrategia, setEstrategia, nomeTime, setNomeTime,
+  enviando, setEnviando, onCriado, onSair,
+}: {
+  salaId: string; userId: string | null;
+  sala: { modo: string };
+  limite: number;
+  formacaoId: FormacaoId; setFormacaoId: (id: FormacaoId) => void;
+  estrategia: Estrategia; setEstrategia: (e: Estrategia) => void;
+  nomeTime: string; setNomeTime: (n: string) => void;
+  enviando: boolean; setEnviando: (b: boolean) => void;
+  onCriado: (criado: SalaDraftRow) => void;
+  onSair: () => void;
+}) {
+  const [tempo, setTempo] = useState(30);
+  const enviadoRef = useRef(false);
+
+  const comecar = async (forcaPadrao = false) => {
+    if (enviadoRef.current) return;
+    enviadoRef.current = true;
+    setEnviando(true);
+    try {
+      const fId = forcaPadrao ? ("4-3-3" as FormacaoId) : formacaoId;
+      const est = forcaPadrao ? ("equilibrada" as Estrategia) : estrategia;
+      const nt = forcaPadrao ? "Meu Time" : (nomeTime.trim() || "Meu Time");
+      const criado = await iniciarDraftOnline({ data: { salaId, formacaoId: fId, estrategia: est, nomeTime: nt } });
+      onCriado(criado as SalaDraftRow);
+      if (forcaPadrao) toast.warning("Tempo esgotado — usando formação 4-3-3 e estratégia equilibrada");
+    } catch (e) {
+      enviadoRef.current = false;
+      toast.error((e as Error).message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tempo <= 0) { comecar(true); return; }
+    const t = setTimeout(() => setTempo(x => x - 1), 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tempo]);
+
+  return (
+    <div className="mx-auto max-w-md px-4 py-6 space-y-6 animate-enter">
+      <header className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="font-display text-3xl uppercase italic tracking-tight">Seu time online</h1>
+          <p className="text-sm text-muted-foreground">Escolha formação e estratégia antes de entrar no draft simultâneo.</p>
+        </div>
+        <Button onClick={onSair} variant="ghost" size="sm" className="text-destructive shrink-0 h-8 px-2 text-[10px] uppercase tracking-widest font-bold">
+          <X className="size-3 mr-1" /> Sair
+        </Button>
+      </header>
+
+      {/* Timer 30s — estourou usa 4-3-3 + equilibrada */}
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 flex items-center gap-2">
+        <span className={cn(
+          "font-display text-2xl font-black tabular-nums shrink-0",
+          tempo <= 10 ? "text-destructive animate-pulse" : "text-foreground",
+        )}>
+          00:{tempo.toString().padStart(2, "0")}
+        </span>
+        <div className="flex-1 space-y-1">
+          <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+            <div className={cn("h-full transition-all duration-1000 ease-linear", tempo <= 10 ? "bg-destructive" : "bg-primary")}
+              style={{ width: `${Math.max(0, Math.min(100, (tempo / 30) * 100))}%` }} />
+          </div>
+          <p className="text-[9px] text-muted-foreground uppercase tracking-widest">
+            Sem escolha em {tempo}s → 4-3-3 / equilibrada
+          </p>
+        </div>
+      </div>
+
+      <section className="space-y-3">
+        <div className="flex items-end justify-between">
+          <h2 className="font-display uppercase tracking-tight text-lg">Formação Tática</h2>
+          <span className="text-[10px] uppercase tracking-widest text-primary">{formacaoId}</span>
+        </div>
+        <MiniCampo formacao={FORMACOES[formacaoId]} escalacao={[]} />
+        <div className="grid grid-cols-3 gap-2">
+          {LISTA_FORMACOES.map(f => (
+            <button key={f.id} onClick={() => setFormacaoId(f.id)}
+              className={cn("rounded-lg border py-3 font-display font-bold uppercase tracking-widest text-xs transition-all",
+                formacaoId === f.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-secondary text-muted-foreground")}>
+              {f.nome}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-display uppercase tracking-tight text-lg">Estratégia</h2>
+        <div className="grid grid-cols-3 gap-2">
+          {(["defensiva", "equilibrada", "ofensiva"] as Estrategia[]).map(e => (
+            <button key={e} onClick={() => setEstrategia(e)}
+              className={cn("rounded-lg border py-3 font-bold uppercase text-[10px] tracking-widest",
+                estrategia === e ? "border-primary bg-primary text-primary-foreground" : "border-border bg-secondary text-muted-foreground")}>
+              {e}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-1.5">
+        <Label>Nome do seu time</Label>
+        <Input value={nomeTime} onChange={e => setNomeTime(e.target.value)} placeholder="Ex: Lendas FC" maxLength={40} />
+      </section>
+
+      <p className="text-[10px] text-muted-foreground text-center">
+        Modo da sala: <span className="font-bold text-primary uppercase">{sala.modo}</span> · {limite} rerolls e {limite} trocas
+      </p>
+
+      <Button onClick={() => comecar(false)} disabled={enviando} className="w-full h-12 font-display uppercase italic tracking-widest text-base font-black">
+        Entrar no draft
+      </Button>
+    </div>
+  );
+}
+
+

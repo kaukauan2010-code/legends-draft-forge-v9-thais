@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useCampanha, type Modo } from "@/lib/campanha";
 import { LISTA_FORMACOES, type FormacaoId } from "@/lib/formacoes";
@@ -51,6 +51,13 @@ function Jogar() {
   return (
     <div className="mx-auto max-w-md px-4 py-4 space-y-4 animate-enter">
       <header>
+        <Link
+          to="/dashboard"
+          onClick={() => useCampanha.getState().resetar()}
+          className="mb-3 inline-flex w-full items-center justify-center rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-destructive"
+        >
+          Voltar ao início
+        </Link>
         <h1 className="font-display text-2xl uppercase italic tracking-tight">Configurar Partida</h1>
         <p className="text-xs text-muted-foreground">Defina como sua campanha vai começar.</p>
       </header>

@@ -5,7 +5,7 @@ import { useCampanha } from "@/lib/campanha";
 import { FORMACOES } from "@/lib/formacoes";
 import { MiniCampo } from "@/components/MiniCampo";
 import { Button } from "@/components/ui/button";
-import { Dices, Shuffle, Shield, Sword, Star, Trash2, X, Lock, Zap } from "lucide-react";
+import { Dices, Shuffle, Shield, Sword, Star, Trash2, X, Lock, Zap, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { statsEscalacao } from "@/lib/simulador";
 import { RARIDADE_TEXT_CLASS, RARIDADE_BORDER_CLASS, RARIDADE_LABEL, posicoesCompativeis, SELECOES } from "@/lib/selecoes";
@@ -55,22 +55,32 @@ function Draft() {
     return () => unsub();
   }, [navigate]);
 
-  // reset timer APENAS quando muda a seleção sorteada
+  // reset timer ao mudar de "fase" do draft (sorteio pendente, seleção ativa,
+  // jogador pendente ou nº de slots preenchidos). Cada vez que o estado muda,
+  // o jogador ganha 30s pra agir.
   useEffect(() => {
     setTempo(30);
-  }, [s.selecaoAtual?.id]);
+  }, [s.selecaoAtual?.id, s.jogadorPendente?.nome, s.escalacao.length]);
 
-  // cronômetro: só corre quando há algo a decidir
+  // cronômetro: roda enquanto o draft está em andamento (faltam slots).
+  // Esgotou? Se há seleção/pendente -> escolha automática.
+  //          Se está aguardando "Sortear" -> sorteia automaticamente.
   useEffect(() => {
-    if (!s.selecaoAtual && !s.jogadorPendente) return;
+    if (!s.slotsRestantes.length) return;
+    if (sorteando) return;
     if (tempo <= 0) {
-      s.forcarFimDraft();
-      toast.warning("Tempo esgotado — escolha automática");
+      if (s.selecaoAtual || s.jogadorPendente) {
+        s.forcarFimDraft();
+        toast.warning("Tempo esgotado — escolha automática");
+      } else {
+        toast.warning("Tempo esgotado — sorteando seleção");
+        sortearAnim();
+      }
       return;
     }
     const t = setTimeout(() => setTempo(x => x - 1), 1000);
     return () => clearTimeout(t);
-  }, [tempo, s.selecaoAtual, s.jogadorPendente]);
+  }, [tempo, s.selecaoAtual, s.jogadorPendente, s.slotsRestantes.length, sorteando]);
 
   // fim do draft → torneio. Guard com ref pra não disparar em loop quando o
   // estado da campanha muda dentro do mesmo render.
@@ -115,6 +125,13 @@ function Draft() {
   return (
     <div className="mx-auto max-w-5xl px-3 py-3 space-y-3">
       {/* HEADER compacto: stats + timer */}
+      <Button
+        variant="outline"
+        onClick={() => { s.resetar(); navigate({ to: "/dashboard" }); }}
+        className="w-full h-9 border-destructive/30 bg-destructive/10 text-destructive font-bold uppercase tracking-widest text-[10px]"
+      >
+        <RotateCcw className="size-3 mr-1.5" /> Voltar ao início
+      </Button>
       <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 space-y-1.5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="min-w-0">
@@ -136,7 +153,7 @@ function Draft() {
             <MiniStat icon={<Trash2 className="size-2.5" />} label="Trocas" value={`${s.trocasRestantes}/${limiteTrocas}`} />
           </div>
         </div>
-        {(s.selecaoAtual || pendente) && (
+        {s.slotsRestantes.length > 0 && (
           <div className="flex items-center gap-2">
             <span className={cn(
               "font-display text-base font-black tabular-nums shrink-0",

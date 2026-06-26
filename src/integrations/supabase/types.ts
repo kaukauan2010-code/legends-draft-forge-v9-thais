@@ -62,10 +62,11 @@ export type Database = {
       partida_online: {
         Row: {
           created_at: string
+          encerrada: boolean
           fase: string
           id: string
-          jogador1_id: string
-          jogador2_id: string
+          jogador1_id: string | null
+          jogador2_id: string | null
           log_eventos: Json
           penaltis: Json | null
           placar1: number
@@ -76,10 +77,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          encerrada?: boolean
           fase?: string
           id?: string
-          jogador1_id: string
-          jogador2_id: string
+          jogador1_id?: string | null
+          jogador2_id?: string | null
           log_eventos?: Json
           penaltis?: Json | null
           placar1?: number
@@ -90,10 +92,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          encerrada?: boolean
           fase?: string
           id?: string
-          jogador1_id?: string
-          jogador2_id?: string
+          jogador1_id?: string | null
+          jogador2_id?: string | null
           log_eventos?: Json
           penaltis?: Json | null
           placar1?: number
@@ -248,6 +251,7 @@ export type Database = {
       }
       sala_jogadores: {
         Row: {
+          bandeira: string | null
           created_at: string
           elenco_online: Json | null
           eliminado_em: string | null
@@ -266,6 +270,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          bandeira?: string | null
           created_at?: string
           elenco_online?: Json | null
           eliminado_em?: string | null
@@ -284,6 +289,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          bandeira?: string | null
           created_at?: string
           elenco_online?: Json | null
           eliminado_em?: string | null
@@ -316,11 +322,13 @@ export type Database = {
           codigo: string
           competicao: string
           created_at: string
+          formacao_default: string
           id: string
           max_jogadores: number
           mestre_id: string
           modo: string
           status: string
+          tipo_draft: string
           updated_at: string
           velocidade: string
         }
@@ -328,11 +336,13 @@ export type Database = {
           codigo: string
           competicao?: string
           created_at?: string
+          formacao_default?: string
           id?: string
           max_jogadores?: number
           mestre_id: string
           modo?: string
           status?: string
+          tipo_draft?: string
           updated_at?: string
           velocidade?: string
         }
@@ -340,11 +350,13 @@ export type Database = {
           codigo?: string
           competicao?: string
           created_at?: string
+          formacao_default?: string
           id?: string
           max_jogadores?: number
           mestre_id?: string
           modo?: string
           status?: string
+          tipo_draft?: string
           updated_at?: string
           velocidade?: string
         }

@@ -5,8 +5,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useConquistas } from "@/lib/useConquistas";
 import { CONQUISTAS } from "@/lib/conquistas";
-import { CampanhaCard } from "@/components/CampanhaCard";
+import { PartidaHistoricoCard, partidasDeCampanhas } from "@/components/CampanhaCard";
+import { lerCampanhasLocais, mesclarCampanhas } from "@/lib/historicoLocal";
 import { Trophy, Swords, Flame, Medal, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Início — World Cup Draft" }] }),
@@ -73,18 +75,31 @@ function Dashboard() {
     },
   });
 
-  const todas = campanhas ?? [];
+  const campanhasLocais = lerCampanhasLocais(user?.id);
+  const todas = mesclarCampanhas(campanhas ?? [], campanhasLocais);
   const campeas = todas.filter(p => p.campeao);
-  const vitoriosas = todas.filter(p => p.fase_alcancada !== "grupos" && p.fase_alcancada !== "eliminado");
+  const todasPartidas = partidasDeCampanhas(todas, 21);
+  const partidasParaStats = partidasDeCampanhas(todas, 9999);
+  const statsHistorico = {
+    total: partidasParaStats.length,
+    vitorias: partidasParaStats.filter(item => item.rodada.minhaVitoria && !item.rodada.empate).length,
+    empates: partidasParaStats.filter(item => item.rodada.empate).length,
+    derrotas: partidasParaStats.filter(item => !item.rodada.minhaVitoria && !item.rodada.empate).length,
+  };
+  const vitoriosas = todasPartidas.filter(item => item.rodada.minhaVitoria && !item.rodada.empate);
+
+  const totalConquistasVisivel = Math.max(conquistas_db ?? 0, totalDesbloqueadas);
 
   const stats = {
-    total: stats_db?.partidas_jogadas ?? 0,
-    vitorias: stats_db?.vitorias ?? 0,
-    titulos: stats_db?.titulos ?? campeas.length,
+    total: Math.max(stats_db?.partidas_jogadas ?? 0, statsHistorico.total),
+    vitorias: Math.max(stats_db?.vitorias ?? 0, statsHistorico.vitorias),
+    empates: Math.max(stats_db?.empates ?? 0, statsHistorico.empates),
+    derrotas: Math.max(stats_db?.derrotas ?? 0, statsHistorico.derrotas),
+    titulos: Math.max(stats_db?.titulos ?? 0, campeas.length),
   };
 
   const listaDoPainel =
-    painelAberto === "partidas" ? todas :
+    painelAberto === "partidas" ? todasPartidas :
     painelAberto === "vitorias" ? vitoriosas :
     painelAberto === "titulos" ? campeas : [];
 
@@ -125,10 +140,16 @@ function Dashboard() {
 
       <section className="relative z-10 grid grid-cols-2 gap-3">
         <HudStatCard icon={Swords} label="Partidas" value={stats.total} accent="cyan" onClick={() => setPainelAberto("partidas")} />
-        <HudStatCard icon={Flame} label="Vitórias" value={stats.vitorias} accent="purple" onClick={() => setPainelAberto("vitorias")} />
+        <HudStatCard
+          icon={Flame}
+          label="V/E/D"
+          value={`${stats.vitorias}/${stats.empates}/${stats.derrotas}`}
+          accent="purple"
+          onClick={() => setPainelAberto("vitorias")}
+        />
         <HudStatCard icon={Trophy} label="Mundiais" value={stats.titulos} accent="cyan" onClick={() => setPainelAberto("titulos")} />
         <Link to="/conquistas" className="block">
-          <HudStatCard icon={Medal} label="Conquistas" value={`${conquistas_db !== undefined ? conquistas_db : totalDesbloqueadas}`} suffix={`/${CONQUISTAS.length}`} accent="purple" progress={(conquistas_db !== undefined ? conquistas_db : totalDesbloqueadas) / CONQUISTAS.length} />
+          <HudStatCard icon={Medal} label="Conquistas" value={`${totalConquistasVisivel}`} suffix={`/${CONQUISTAS.length}`} accent="purple" progress={totalConquistasVisivel / CONQUISTAS.length} />
         </Link>
       </section>
 
@@ -175,9 +196,18 @@ function Dashboard() {
                 Nada por aqui ainda.
               </div>
             )}
-            {listaDoPainel.map(p => (
-              <CampanhaCard key={p.id} p={p} />
-            ))}
+            {painelAberto === "titulos"
+              ? listaDoPainel.map((p: any) => (
+                  <div key={p.id} className="rounded-xl border border-legendary bg-card p-4">
+                    <div className="font-display uppercase tracking-tight font-bold text-legendary">Título mundial</div>
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
+                      {p.modo} · {p.formacao} · {new Date(p.created_at).toLocaleString("pt-BR")}
+                    </div>
+                  </div>
+                ))
+              : listaDoPainel.map((item: any) => (
+                  <PartidaHistoricoCard key={item.id} item={item} />
+                ))}
           </div>
         </div>
       )}
@@ -202,7 +232,7 @@ function HudStatCard({ icon: Icon, label, value, suffix, accent = "cyan", progre
         <Icon className={`size-4 ${accentClass} mb-3`} />
         <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold mb-1">{label}</p>
         <div className="flex items-end gap-1">
-          <p className="font-display text-2xl font-bold leading-none">{value}</p>
+          <p className={cn("font-display font-bold leading-none", typeof value === "string" && value.includes("/") ? "text-xl tracking-tight" : "text-2xl")}>{value}</p>
           {suffix && <p className="text-xs text-muted-foreground font-bold mb-0.5">{suffix}</p>}
         </div>
         {progress !== undefined && (

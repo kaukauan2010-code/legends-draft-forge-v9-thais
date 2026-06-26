@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCampanha } from "@/lib/campanha";
 import type { EstadoCampanha } from "@/lib/campanha";
 import { useConquistas } from "@/lib/useConquistas";
+import { salvarCampanhaLocal } from "@/lib/historicoLocal";
 import { Button } from "@/components/ui/button";
 import { Play, FastForward, Zap, Trophy, Skull, ChevronDown, Target, RotateCcw, Users, Network } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -101,18 +102,21 @@ function Torneio() {
       if (!user || !s.config) return;
       const st = useCampanha.getState();
       if (!st.partidaId) return;
-      const { error } = await supabase.from("partidas").upsert({
+      const payload = {
         id: st.partidaId,
         user_id: user.id,
-        modo: s.config.modo,
-        formacao: s.config.formacaoId,
-        estrategia: s.config.estrategia,
+        modo: st.config?.modo ?? s.config.modo,
+        formacao: st.config?.formacaoId ?? s.config.formacaoId,
+        estrategia: st.config?.estrategia ?? s.config.estrategia,
         fase_alcancada: st.fase,
         pontuacao: 0,
         campeao: st.fase === "campeao",
         elenco: st.escalacao as any,
         log: st.historicoJogos as any,
-      }, { onConflict: "id" });
+        created_at: new Date().toISOString(),
+      };
+      salvarCampanhaLocal(user.id, payload);
+      const { error } = await supabase.from("partidas").upsert(payload, { onConflict: "id" });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -152,6 +156,9 @@ function Torneio() {
     const ultimo = ultimoStr ? Number(ultimoStr) : 0;
     if (ultimo >= total) return;
     const pendentes = st.historicoJogos.slice(ultimo);
+    // Marca imediatamente como processado para evitar duplicidade em re-render,
+    // StrictMode ou mudança de fase enquanto a gravação assíncrona ainda roda.
+    if (typeof window !== "undefined") localStorage.setItem(chave, String(total));
     (async () => {
       for (let i = 0; i < pendentes.length; i++) {
         const h = pendentes[i]!;
@@ -178,7 +185,6 @@ function Torneio() {
           console.error("[torneio] erro registrando partida", e);
         }
       }
-      if (typeof window !== "undefined") localStorage.setItem(chave, String(total));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.historicoJogos.length, s.fase, user]);
@@ -242,33 +248,9 @@ function Torneio() {
         const estadoPos = useCampanha.getState();
         const ultimoJogo = estadoPos.historicoJogos[estadoPos.historicoJogos.length - 1];
         const campanhaEncerrada = estadoPos.fase === "campeao" || estadoPos.fase === "eliminado";
-        const lendariosNaEscalacao = estadoPos.escalacao.filter(j => j.raridade === "lendario").length;
-        const improvisadosNaEscalacao = estadoPos.escalacao.filter(j => j.improvisado).length;
-        if (user && ultimoJogo) {
-          const empateReal = res.golsCasa === res.golsFora && !ultimoJogo.penaltis;
-          const vitoriaReal = !empateReal && ultimoJogo.minhaVitoria;
-          registrarPartida({
-            vitoria: vitoriaReal,
-            empate: empateReal,
-            golsMeu: res.golsCasa,
-            golsAdv: res.golsFora,
-            formacaoId: estadoPos.config?.formacaoId ?? "",
-            selecoesUsadas: estadoPos.selecoesUsadas,
-            jogadoresLendariosEscalados: lendariosNaEscalacao,
-            improvisados: improvisadosNaEscalacao,
-            foiPenaltis: !!ultimoJogo.penaltis,
-            venceuPenaltis: ultimoJogo.penaltis ? ultimoJogo.minhaVitoria : undefined,
-            campanhaEncerrada,
-            campeao: estadoPos.fase === "campeao",
-            modo: estadoPos.config?.modo,
-            trocasUsadasNestaCompanha: campanhaEncerrada
-              ? (estadoPos.config?.modo === "classico" ? 3 : 1) - estadoPos.trocasRestantes
-              : undefined,
-            rerollsUsadosNestaCompanha: undefined,
-          }).then(novas => {
-            novas.forEach(c => toast.success(`🏆 Conquista desbloqueada: ${c.nome}`, { duration: 4000 }));
-          });
-        }
+        // Estatísticas/conquistas são registradas em um único lugar: o useEffect
+        // que observa `historicoJogos.length`. Registrar aqui também duplicava
+        // partidas e fazia a mesma conquista notificar mais de uma vez.
         // Se a partida foi para pênaltis, reproduz a disputa cobrança a cobrança
         // antes de fechar a tela de partida ao vivo. O jogador pode ser "casa" ou
         // "fora" dependendo de como o confronto foi montado no chaveamento.
@@ -373,6 +355,17 @@ function Torneio() {
     }
   };
 
+  const voltarAoInicio = () => {
+    if (intervaloRef.current) clearInterval(intervaloRef.current);
+    if (autoTimeoutRef.current) clearTimeout(autoTimeoutRef.current);
+    setPartidaAtiva(null);
+    setPenaltisAoVivo(null);
+    setResumoPosJogo(null);
+    setContagemAuto(null);
+    s.resetar();
+    navigate({ to: "/dashboard" });
+  };
+
   if (!meu || !s.config) return null;
 
   // === ORDEM DE RENDER ===
@@ -387,8 +380,11 @@ function Torneio() {
   // --- PARTIDA AO VIVO (PRIORIDADE 1) ---
   if (partidaAtiva) {
     const placar = partidaAtiva.placar.split(" x ");
+    const meuStats = statsTime(meu);
+    const advStats = adversarioAtivo ? statsTime(adversarioAtivo) : null;
     return (
       <div className="mx-auto max-w-sm px-3 py-3 space-y-3">
+        <BotaoVoltarInicio onClick={voltarAoInicio} />
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="text-[9px] uppercase tracking-widest text-muted-foreground text-center mb-1.5">{(faseAtiva ?? s.fase).toUpperCase()}</div>
           <div className="flex items-center justify-around">
@@ -406,6 +402,15 @@ function Torneio() {
               <div className="flex items-center justify-center gap-1 text-[8px] uppercase tracking-widest text-muted-foreground">
                 <span className="size-1.5 rounded-full bg-red-500" /> Vermelho
               </div>
+            </div>
+          </div>
+          <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-border/50 pt-2 text-[9px] uppercase tracking-widest text-muted-foreground">
+            <div className="text-center">
+              <span className="font-bold text-foreground">FOR {meuStats.forca}</span> · ATK {meuStats.ataque} · DEF {meuStats.defesa}
+            </div>
+            <span className="text-border">|</span>
+            <div className="text-center">
+              {advStats ? <><span className="font-bold text-foreground">FOR {advStats.forca}</span> · ATK {advStats.ataque} · DEF {advStats.defesa}</> : "—"}
             </div>
           </div>
           <div className="mt-2 text-center text-primary font-mono text-xs">{partidaAtiva.minuto}'</div>
@@ -445,6 +450,7 @@ function Torneio() {
   if (s.mostrarApresentacaoGrupos) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-6 space-y-5 pb-28 animate-enter">
+        <BotaoVoltarInicio onClick={voltarAoInicio} />
         <header className="text-center">
           <Users className="mx-auto size-10 text-primary mb-2" />
           <h1 className="font-display text-3xl uppercase italic tracking-tight">Fase de Grupos</h1>
@@ -509,6 +515,7 @@ function Torneio() {
     if (etapaMata === "preview") {
       return (
         <div className="mx-auto max-w-3xl px-4 py-6 pb-28 animate-enter">
+          <BotaoVoltarInicio onClick={voltarAoInicio} />
           <header className="text-center mb-5">
             <Trophy className="mx-auto size-10 text-primary mb-2" />
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Próxima partida</div>
@@ -552,6 +559,7 @@ function Torneio() {
 
     return (
       <div className="mx-auto max-w-3xl px-4 py-6 pb-28 animate-enter">
+        <BotaoVoltarInicio onClick={voltarAoInicio} />
         <header className="text-center mb-5">
           <Network className="mx-auto size-10 text-primary mb-2" />
           <h1 className="font-display text-3xl uppercase italic tracking-tight">{tituloFase(faseChave)}</h1>
@@ -573,9 +581,9 @@ function Torneio() {
                 s.confirmarChaveamento();
                 setTimeout(() => jogarPartida(), 0);
               }}
-              className="h-12 font-display uppercase tracking-widest font-black"
+              className="h-12 px-2 font-display uppercase tracking-wider sm:tracking-widest font-black text-[11px] sm:text-sm whitespace-nowrap overflow-hidden"
             >
-              <Play className="size-4 mr-1.5" /> Iniciar partida
+              <Play className="size-4 mr-1 shrink-0" /> <span className="sm:hidden">Iniciar</span><span className="hidden sm:inline">Iniciar partida</span>
             </Button>
           </div>
           <MinhaSelecaoLateral meu={meu} />
@@ -617,8 +625,9 @@ function Torneio() {
     const sufixoFase = (faseAtiva ?? s.fase ?? "").toUpperCase();
     return (
       <div className="min-h-[100svh] bg-pen-dark text-foreground font-pen-mono flex flex-col -mx-4 -my-6 md:-mx-0">
+        <BotaoVoltarInicio onClick={voltarAoInicio} compacto />
         {/* Top nav / fase */}
-        <nav className="px-6 py-4 flex justify-between items-center border-b border-white/10">
+        <nav className="px-3 py-2 flex justify-between items-center border-b border-white/10">
           <span className="text-[10px] tracking-[0.2em] uppercase text-foreground/40">
             {sufixoFase ? `${sufixoFase} — Pênaltis` : "Disputa de Pênaltis"}
           </span>
@@ -629,17 +638,17 @@ function Torneio() {
         </nav>
 
         {/* Scoreboard */}
-        <header className="p-6 space-y-6">
+        <header className="px-3 py-2 space-y-2">
           <div className="flex justify-between items-end gap-2">
             <div className="flex flex-col items-start gap-1 min-w-0">
-              <FlagEmoji emoji={flagCasa} size={40} />
-              <h2 className="font-pen-display text-2xl tracking-wide truncate max-w-[10ch]">{nomeCasa}</h2>
-              <div className="flex gap-1.5">
+              <FlagEmoji emoji={flagCasa} size={24} />
+              <h2 className="font-pen-display text-sm sm:text-lg tracking-wide truncate max-w-[9ch]">{nomeCasa}</h2>
+              <div className="flex gap-1">
                 {indCasa.map((st, i) => (
                   <div
                     key={i}
                     className={cn(
-                      "size-3 rounded-sm border",
+                       "size-2 rounded-sm border",
                       st === "gol" && "bg-pen-goal border-pen-goal",
                       st === "miss" && "bg-pen-miss border-pen-miss",
                       st === "pendente" && "bg-white/5 border-white/15",
@@ -650,21 +659,21 @@ function Torneio() {
             </div>
 
             <div className="flex flex-col items-center shrink-0">
-              <div className="text-5xl font-pen-display leading-none tracking-tighter tabular-nums">
+              <div className="text-3xl sm:text-4xl font-pen-display leading-none tracking-tighter tabular-nums">
                 {placarCasa} <span className="text-white/20">x</span> {placarFora}
               </div>
-              <span className="text-[10px] uppercase text-foreground/40 mt-2">Placar Atual</span>
+              <span className="text-[9px] uppercase text-foreground/40 mt-1">Placar Atual</span>
             </div>
 
             <div className="flex flex-col items-end gap-1 min-w-0">
-              <FlagEmoji emoji={flagFora} size={40} />
-              <h2 className="font-pen-display text-2xl tracking-wide truncate max-w-[10ch]">{nomeFora}</h2>
-              <div className="flex gap-1.5">
+              <FlagEmoji emoji={flagFora} size={24} />
+              <h2 className="font-pen-display text-sm sm:text-lg tracking-wide truncate max-w-[9ch]">{nomeFora}</h2>
+              <div className="flex gap-1">
                 {indFora.map((st, i) => (
                   <div
                     key={i}
                     className={cn(
-                      "size-3 rounded-sm border",
+                       "size-2 rounded-sm border",
                       st === "gol" && "bg-pen-goal border-pen-goal",
                       st === "miss" && "bg-pen-miss border-pen-miss",
                       st === "pendente" && "bg-white/5 border-white/15",
@@ -677,13 +686,13 @@ function Torneio() {
         </header>
 
         {/* Stadium view (gol + bola + luva do goleiro) */}
-        <main className="relative flex-1 flex flex-col justify-center items-center px-6 overflow-hidden">
+        <main className="relative flex-1 flex flex-col justify-center items-center px-3 overflow-hidden min-h-[300px]">
           <div className="absolute inset-0 pointer-events-none"
                style={{ background: "radial-gradient(ellipse at 50% 60%, var(--pen-light) 0%, transparent 60%)" }} />
 
-          <div className="relative w-full max-w-sm aspect-[4/5] flex flex-col">
+          <div className="relative w-full max-w-[250px] sm:max-w-[300px] aspect-[4/5] flex flex-col">
             {/* Trave + rede */}
-            <div className="relative w-full h-56 border-x-4 border-t-4 border-white/80 rounded-t-sm overflow-hidden shadow-[0_-20px_60px_-10px_rgba(255,255,255,0.1)]">
+            <div className="relative w-full h-32 sm:h-40 border-x-4 border-t-4 border-white/80 rounded-t-sm overflow-hidden shadow-[0_-20px_60px_-10px_rgba(255,255,255,0.1)]">
               {/* rede */}
               <div className="absolute inset-0 opacity-25" style={{
                 backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.5) 1px, transparent 1px)",
@@ -698,7 +707,7 @@ function Torneio() {
                     {/* luva do goleiro */}
                     <div
                       key={`luva-${cobrancasFeitas.length}`}
-                      className="absolute text-3xl transition-all duration-500 ease-out animate-pen-enter"
+                        className="absolute text-xl sm:text-2xl transition-all duration-500 ease-out animate-pen-enter"
                       style={{ left: `${pos.luva.x}%`, top: `${pos.luva.y}%`, transform: "translate(-50%, -50%)" }}
                     >
                       🧤
@@ -706,7 +715,7 @@ function Torneio() {
                     {/* bola */}
                     <div
                       key={`bola-${cobrancasFeitas.length}`}
-                      className="absolute text-2xl transition-all duration-700 ease-out"
+                        className="absolute text-lg sm:text-xl transition-all duration-700 ease-out"
                       style={{ left: `${pos.bola.x}%`, top: `${pos.bola.y}%`, transform: "translate(-50%, -50%)", filter: ultima.acertou ? "drop-shadow(0 0 8px rgba(34,197,94,0.8))" : "drop-shadow(0 0 8px rgba(239,68,68,0.8))" }}
                     >
                       ⚽
@@ -715,7 +724,7 @@ function Torneio() {
                     <div
                       key={`label-${cobrancasFeitas.length}`}
                       className={cn(
-                        "absolute top-2 left-1/2 -translate-x-1/2 font-pen-display text-3xl uppercase tracking-widest animate-pen-enter",
+                          "absolute top-2 left-1/2 -translate-x-1/2 font-pen-display text-xl sm:text-2xl uppercase tracking-widest animate-pen-enter",
                         ultima.acertou ? "text-pen-goal" : "text-pen-miss",
                       )}
                     >
@@ -730,7 +739,7 @@ function Torneio() {
             <div className="flex-1 relative" style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.05), transparent)" }}>
               <div className="absolute top-0 left-0 w-full h-px bg-white/10" />
               <div className="absolute top-16 left-1/2 -translate-x-1/2">
-                <div className="size-4 rounded-full bg-white/20 animate-pen-focus" />
+                <div className="size-3 rounded-full bg-white/20 animate-pen-focus" />
               </div>
             </div>
           </div>
@@ -739,7 +748,7 @@ function Torneio() {
           {proximoBatedor && !acabou && (
             <div key={indiceAtual} className="absolute bottom-4 left-0 w-full px-8 text-center animate-pen-enter">
               <p className="text-[10px] uppercase tracking-[0.3em] text-foreground/50 mb-1">Cobrando agora</p>
-              <h3 className="font-pen-display text-3xl tracking-wider">{proximoBatedor.jogador}</h3>
+              <h3 className="font-pen-display text-xl sm:text-2xl tracking-wider">{proximoBatedor.jogador}</h3>
               <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full">
                 <FlagEmoji emoji={proximoBatedor.time === "casa" ? flagCasa : flagFora} size={12} />
                 <span className="text-[10px] font-bold text-pen-goal">
@@ -751,11 +760,11 @@ function Torneio() {
         </main>
 
         {/* Footer: histórico SEPARADO por time */}
-        <footer className="p-4 pt-2 space-y-3">
+        <footer className="p-2 pt-1 space-y-1.5">
           <div className="text-center text-[10px] uppercase tracking-[0.3em] text-foreground/40">
             {acabou ? "Disputa finalizada" : `Automático · ${velocidade}`}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+           <div className="grid grid-cols-2 gap-2">
             <TimePenaltisLista nome={nomeCasa} bandeira={flagCasa} todas={cobrancas.filter(c => c.time === "casa")} feitas={cobrancasFeitas} alinhamento="esquerda" />
             <TimePenaltisLista nome={nomeFora} bandeira={flagFora} todas={cobrancas.filter(c => c.time === "fora")} feitas={cobrancasFeitas} alinhamento="direita" />
           </div>
@@ -775,6 +784,7 @@ function Torneio() {
     const golsFora = extrairGols(eventos, "fora");
     return (
       <div className="mx-auto max-w-md px-4 py-6 space-y-4 animate-enter pb-10">
+        <BotaoVoltarInicio onClick={voltarAoInicio} />
         <div className={cn("rounded-2xl border-2 p-4 text-center", corBorda)}>
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">{faseLabel} · Fim de jogo</div>
           <div className="flex items-center justify-around">
@@ -854,6 +864,7 @@ function Torneio() {
     const ultimaFase = s.historicoJogos[s.historicoJogos.length - 1]?.fase ?? "";
     return (
       <div className="mx-auto max-w-md px-4 py-6 space-y-6 animate-enter pb-10">
+        <BotaoVoltarInicio onClick={voltarAoInicio} />
         <div className={cn("rounded-2xl border-2 p-6 text-center", venceu ? "border-legendary bg-legendary/10 glow-legendary" : "border-destructive/40 bg-destructive/5")}>
           {venceu ? <Trophy className="mx-auto size-16 text-legendary mb-3" /> : <Skull className="mx-auto size-16 text-destructive mb-3" />}
           <h1 className="font-display text-4xl uppercase italic font-black tracking-tighter">
@@ -928,6 +939,7 @@ function Torneio() {
   // --- LOBBY do torneio ---
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 space-y-5 pb-10">
+      <BotaoVoltarInicio onClick={voltarAoInicio} />
       <header>
         <h1 className="font-display text-3xl uppercase italic tracking-tight">{tituloFase(s.fase)}</h1>
       </header>
@@ -1167,18 +1179,18 @@ function TimePenaltisLista({ nome, bandeira, todas, feitas, alinhamento }: {
   nome: string; bandeira: string; todas: CobrancaPenalti[]; feitas: CobrancaPenalti[]; alinhamento: "esquerda" | "direita";
 }) {
   return (
-    <div className={cn("bg-white/5 rounded p-2 border border-white/10", alinhamento === "direita" && "text-right")}>
+    <div className={cn("bg-white/5 rounded p-1.5 sm:p-2 border border-white/10", alinhamento === "direita" && "text-right")}>
       <div className={cn("flex items-center gap-1.5 mb-1.5", alinhamento === "direita" && "flex-row-reverse")}>
         <FlagEmoji emoji={bandeira} size={14} />
-        <span className="text-[10px] font-bold uppercase tracking-widest truncate">{nome}</span>
+        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest truncate">{nome}</span>
       </div>
       <ul className="space-y-0.5">
         {todas.map((c, i) => {
           const concluida = feitas.includes(c);
           return (
-            <li key={i} className={cn("flex items-center gap-1.5 text-[10px]", alinhamento === "direita" && "flex-row-reverse")}>
+            <li key={i} className={cn("flex items-center gap-1 text-[9px] sm:text-[10px]", alinhamento === "direita" && "flex-row-reverse")}>
               <span className={cn(
-                "size-2 rounded-sm shrink-0",
+                "size-1.5 sm:size-2 rounded-sm shrink-0",
                 !concluida ? "bg-white/10" : c.acertou ? "bg-pen-goal" : "bg-pen-miss",
               )} />
               <span className={cn("flex-1 truncate", !concluida && "text-foreground/40")}>{c.rodada}º · {c.jogador}</span>
@@ -1268,12 +1280,18 @@ function MinhaSelecaoLateral({ meu }: { meu: Time }) {
 // Mini-card vertical com o 11 inicial (cor de raridade + número + nome + força).
 // Usado no resumo pós-partida para mostrar meu time e adversário lado a lado.
 function TimeEscalacao({ time, titulo }: { time: Time; titulo: string }) {
+  const st = statsTime(time);
   return (
     <div className="rounded-xl border border-border bg-card p-2">
       <div className="text-[9px] uppercase tracking-widest text-muted-foreground text-center mb-1">{titulo}</div>
       <div className="flex items-center gap-1 mb-2 justify-center">
         <FlagEmoji emoji={time.isCPU ? time.bandeira : "🏆"} size={16} />
         <span className="font-display text-[10px] uppercase font-bold truncate">{time.nome}</span>
+      </div>
+      <div className="mb-2 grid grid-cols-3 gap-1 rounded bg-secondary/50 px-1 py-1 text-center">
+        <Stat label="FOR" value={st.forca} />
+        <Stat label="ATK" value={st.ataque} />
+        <Stat label="DEF" value={st.defesa} />
       </div>
       <ul className="space-y-1">
         {time.escalacao.map(j => (
@@ -1316,6 +1334,21 @@ function Stat({ label, value }: { label: string; value: number }) {
       <span className="text-[9px] uppercase tracking-widest text-muted-foreground">{label}</span>
       <span className="font-display text-base font-black tabular-nums">{value || "—"}</span>
     </div>
+  );
+}
+
+function BotaoVoltarInicio({ onClick, compacto = false }: { onClick: () => void; compacto?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center justify-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive font-bold uppercase tracking-widest active:scale-[0.98]",
+        compacto ? "mx-3 mt-3 px-3 py-1.5 text-[9px]" : "w-full px-3 py-2 text-[10px]",
+      )}
+    >
+      <RotateCcw className="size-3" /> Voltar ao início
+    </button>
   );
 }
 
